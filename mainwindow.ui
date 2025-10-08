@@ -17,8 +17,8 @@
    <widget class="QFrame" name="Cannitech">
     <property name="geometry">
      <rect>
-      <x>0</x>
-      <y>50</y>
+      <x>10</x>
+      <y>40</y>
       <width>281</width>
       <height>651</height>
      </rect>
@@ -325,7 +325,7 @@ font: bold 11pt &quot;Arial&quot;;</string>
       <rect>
        <x>160</x>
        <y>590</y>
-       <width>101</width>
+       <width>111</width>
        <height>51</height>
       </rect>
      </property>
@@ -443,7 +443,7 @@ font: bold 11pt &quot;Arial&quot;;</string>
      <number>0</number>
     </property>
     <property name="currentIndex">
-     <number>2</number>
+     <number>0</number>
     </property>
     <widget class="QWidget" name="Employe_2">
      <widget class="QStackedWidget" name="client_3">
@@ -3086,8 +3086,8 @@ font: bold 11pt &quot;Arial&quot;;</string>
           <rect>
            <x>200</x>
            <y>10</y>
-           <width>91</width>
-           <height>20</height>
+           <width>191</width>
+           <height>31</height>
           </rect>
          </property>
          <property name="text">
@@ -3097,10 +3097,10 @@ font: bold 11pt &quot;Arial&quot;;</string>
         <widget class="QLabel" name="label_22">
          <property name="geometry">
           <rect>
-           <x>20</x>
+           <x>10</x>
            <y>50</y>
-           <width>71</width>
-           <height>16</height>
+           <width>111</width>
+           <height>20</height>
           </rect>
          </property>
          <property name="text">
@@ -3110,9 +3110,9 @@ font: bold 11pt &quot;Arial&quot;;</string>
         <widget class="QLineEdit" name="lineEdit">
          <property name="geometry">
           <rect>
-           <x>100</x>
+           <x>130</x>
            <y>50</y>
-           <width>141</width>
+           <width>121</width>
            <height>20</height>
           </rect>
          </property>
@@ -3128,7 +3128,7 @@ font: bold 11pt &quot;Arial&quot;;</string>
           <rect>
            <x>260</x>
            <y>50</y>
-           <width>61</width>
+           <width>81</width>
            <height>16</height>
           </rect>
          </property>
@@ -3139,9 +3139,9 @@ font: bold 11pt &quot;Arial&quot;;</string>
         <widget class="QDateEdit" name="dateEdit">
          <property name="geometry">
           <rect>
-           <x>320</x>
+           <x>349</x>
            <y>50</y>
-           <width>110</width>
+           <width>101</width>
            <height>22</height>
           </rect>
          </property>
@@ -3477,7 +3477,7 @@ font: bold 11pt &quot;Arial&quot;;</string>
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>160</y>
+        <y>150</y>
         <width>1011</width>
         <height>491</height>
        </rect>
@@ -4059,6 +4059,173 @@ font: bold 11pt &quot;Arial&quot;;</string>
        <zorder>cruds_5</zorder>
        <zorder>trirecherche_5</zorder>
        <zorder>liste_6</zorder>
+      </widget>
+      <widget class="QWidget" name="page_5">
+       <widget class="QFrame" name="cruds_10">
+        <property name="geometry">
+         <rect>
+          <x>10</x>
+          <y>20</y>
+          <width>981</width>
+          <height>471</height>
+         </rect>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">background-color: #1e2a38;
+color: white;
+font: bold 11pt &quot;Arial&quot;;
+
+</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Shape::NoFrame</enum>
+        </property>
+        <widget class="QLabel" name="idmaison_2">
+         <property name="geometry">
+          <rect>
+           <x>40</x>
+           <y>10</y>
+           <width>311</width>
+           <height>41</height>
+          </rect>
+         </property>
+         <property name="styleSheet">
+          <string notr="true"/>
+         </property>
+         <property name="text">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;🚨 Gestion des alertes Smart City&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+        </widget>
+        <widget class="QTableWidget" name="tableau_10">
+         <property name="geometry">
+          <rect>
+           <x>80</x>
+           <y>80</y>
+           <width>601</width>
+           <height>141</height>
+          </rect>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">QTableWidget {
+    background-color: white;        /* cellules blanches */
+    color: #1e2a38;                 /* texte bleu foncé */
+    border: 2px solid #1e2a38;      /* bordures du tableau */
+    font: bold 11pt &quot;Arial&quot;;
+}
+
+QTableWidget::item {
+    background-color: white;        /* garde les cellules blanches */
+    color: #1e2a38;
+}
+
+QHeaderView::section {
+    background-color: #1e2a38;      /* en-tête bleu foncé */
+    color: white;                   /* texte blanc */
+    font: bold 11pt &quot;Arial&quot;;
+    border: 1px solid #1e2a38;
+}
+</string>
+         </property>
+         <column>
+          <property name="text">
+           <string>zone</string>
+          </property>
+          <property name="font">
+           <font>
+            <bold>true</bold>
+           </font>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>niveau</string>
+          </property>
+          <property name="font">
+           <font>
+            <bold>true</bold>
+           </font>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>statut</string>
+          </property>
+          <property name="font">
+           <font>
+            <bold>true</bold>
+           </font>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>date</string>
+          </property>
+          <property name="font">
+           <font>
+            <bold>true</bold>
+           </font>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Type</string>
+          </property>
+          <property name="font">
+           <font>
+            <bold>true</bold>
+           </font>
+          </property>
+         </column>
+        </widget>
+        <widget class="QLabel" name="idmaison_3">
+         <property name="geometry">
+          <rect>
+           <x>60</x>
+           <y>60</y>
+           <width>171</width>
+           <height>21</height>
+          </rect>
+         </property>
+         <property name="styleSheet">
+          <string notr="true"/>
+         </property>
+         <property name="text">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Liste des alertes :&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+        </widget>
+        <widget class="QLabel" name="idmaison_4">
+         <property name="geometry">
+          <rect>
+           <x>50</x>
+           <y>230</y>
+           <width>311</width>
+           <height>41</height>
+          </rect>
+         </property>
+         <property name="styleSheet">
+          <string notr="true"/>
+         </property>
+         <property name="text">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;🗺️ Localisation interactive &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+        </widget>
+        <widget class="QLabel" name="label_24">
+         <property name="geometry">
+          <rect>
+           <x>80</x>
+           <y>280</y>
+           <width>571</width>
+           <height>171</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="pixmap">
+          <pixmap>../map.png</pixmap>
+         </property>
+        </widget>
+       </widget>
       </widget>
      </widget>
      <widget class="QProgressBar" name="pourcentage_13">
@@ -5980,7 +6147,7 @@ font: bold 11pt &quot;Arial&quot;;</string>
      <x>0</x>
      <y>0</y>
      <width>1366</width>
-     <height>18</height>
+     <height>26</height>
     </rect>
    </property>
   </widget>
