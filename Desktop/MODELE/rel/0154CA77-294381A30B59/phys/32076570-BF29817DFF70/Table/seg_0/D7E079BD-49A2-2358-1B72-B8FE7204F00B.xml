@@ -1,0 +1,59 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<TableProxyOraclev11g class="oracle.dbtools.crest.model.design.storage.oracle.v11g.TableProxyOraclev11g" name="CABINETS" directorySegmentName="seg_0" id="D7E079BD-49A2-2358-1B72-B8FE7204F00B">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<schemaObject>1130CFE9-3DCC-6209-71A8-7D2CB765A4D3</schemaObject>
+<logging>YES</logging>
+<partitionedRowMovement>DISABLE</partitionedRowMovement>
+<segment>15A9ECEE-EBFC-EDFE-A422-1F692C07BA73</segment>
+<tableSpace>3A21ACE8-982A-57C9-92D9-5061C84B5047</tableSpace>
+<temporaryChanged>false</temporaryChanged>
+<accessDriverType>oracle_loader</accessDriverType>
+<rejectLimit></rejectLimit>
+<columnProxies itemClass="oracle.dbtools.crest.model.design.storage.oracle.v12c.ColumnProxyOraclev12c">
+<ColumnProxy name="NOM" id="8897ECFE-BABF-C326-E5E4-F35496E300BC">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="TYPE" id="EA974662-8689-4E3A-266C-7D36B2AF8E90">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="ID_CABINETS" id="FC22525D-ECB2-28D3-33CF-291FFBEAFFA9">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="ADRESSE" id="FE852648-74F1-1ED8-8A5C-1F19C8929966">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+</columnProxies>
+<indexProxies>
+<IndexProxy class="oracle.dbtools.crest.model.design.storage.oracle.v10g.IndexProxyOraclev10g" name="PK_CAB" id="F010476B-F56A-6E45-EDEB-D93CDA41972E">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<schemaObject>1130CFE9-3DCC-6209-71A8-7D2CB765A4D3</schemaObject>
+<segment>5ABA8252-9259-8EE6-8192-9FBD65AE21DB</segment>
+<tableSpace>3A21ACE8-982A-57C9-92D9-5061C84B5047</tableSpace>
+</IndexProxy>
+</indexProxies>
+<primaryKeys>
+<PrimaryKey class="oracle.dbtools.crest.model.design.storage.oracle.v10g.PKProxyOraclev10g" name="PK_CAB" id="9D2C00D8-D1A8-3537-3794-9CA3D1949515">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<segment>5ABA8252-9259-8EE6-8192-9FBD65AE21DB</segment>
+<tableSpace>3A21ACE8-982A-57C9-92D9-5061C84B5047</tableSpace>
+<existingIndex>F010476B-F56A-6E45-EDEB-D93CDA41972E</existingIndex>
+<indexSegment>5ABA8252-9259-8EE6-8192-9FBD65AE21DB</indexSegment>
+<indexSort>SORTED</indexSort>
+<usingIndex>BY INDEX NAME</usingIndex>
+</PrimaryKey>
+</primaryKeys>
+</TableProxyOraclev11g>

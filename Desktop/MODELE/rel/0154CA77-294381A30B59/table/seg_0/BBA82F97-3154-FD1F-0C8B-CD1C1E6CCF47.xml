@@ -1,0 +1,174 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<Table class="oracle.dbtools.crest.model.design.relational.Table" directorySegmentName="seg_0" id="BBA82F97-3154-FD1F-0C8B-CD1C1E6CCF47" schemaObject="1130CFE9-3DCC-6209-71A8-7D2CB765A4D3" name="VEHICULES">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>VEHICULES</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<allowColumnReorder>false</allowColumnReorder>
+<existDependencyGenerateInDDl>true</existDependencyGenerateInDDl>
+<parsed>true</parsed>
+<columns itemClass="oracle.dbtools.crest.model.design.relational.Column">
+<Column name="IMMATT" id="DF6BEB5A-14DD-2039-4252-6786B6C56A71">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>VEHICULES</sourceObjSchema>
+<sourceObjName>IMMATT</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT024</logicalDatatype>
+<dataTypeSize>20 BYTE</dataTypeSize>
+<ownDataTypeParameters>20 BYTE,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="MODELE" id="34737550-8615-1872-6FA9-960FA97DF7B9">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>VEHICULES</sourceObjSchema>
+<sourceObjName>MODELE</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT024</logicalDatatype>
+<dataTypeSize>20 BYTE</dataTypeSize>
+<ownDataTypeParameters>20 BYTE,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="MARQUE" id="88592B6C-6BE5-B95D-4D8F-82C534A244C6">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>VEHICULES</sourceObjSchema>
+<sourceObjName>MARQUE</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT024</logicalDatatype>
+<dataTypeSize>20 BYTE</dataTypeSize>
+<ownDataTypeParameters>20 BYTE,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="ETAT" id="8E812E73-6E04-627B-4AF9-EAD714DCFA90">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>VEHICULES</sourceObjSchema>
+<sourceObjName>ETAT</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT024</logicalDatatype>
+<dataTypeSize>20 BYTE</dataTypeSize>
+<ownDataTypeParameters>20 BYTE,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="TYPE" id="7A8FD6BA-2B5D-7807-7669-726BF0D180AA">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>VEHICULES</sourceObjSchema>
+<sourceObjName>TYPE</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT024</logicalDatatype>
+<dataTypeSize>20 BYTE</dataTypeSize>
+<ownDataTypeParameters>20 BYTE,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="SRV" id="1BA91702-7BA7-E6E4-203D-53C7BA23C9CE">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>VEHICULES</sourceObjSchema>
+<sourceObjName>SRV</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT024</logicalDatatype>
+<dataTypeSize>20 BYTE</dataTypeSize>
+<ownDataTypeParameters>20 BYTE,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="DATE_DE_MAIN" id="0F893BB4-BB88-9032-1977-A1FB805178E4">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>VEHICULES</sourceObjSchema>
+<sourceObjName>DATE_DE_MAIN</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT007</logicalDatatype>
+<dataTypeSize>7</dataTypeSize>
+<ownDataTypeParameters>7,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="ID_RES" id="1AFF8779-644E-375D-4C31-62F2F270C1D3">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>VEHICULES</sourceObjSchema>
+<sourceObjName>ID_RES</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT019</logicalDatatype>
+<ownDataTypeParameters>,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+<associations>
+<colAssociation fkAssociation="AF8C33DE-1155-8814-A0D8-2EA29A480B39" referredColumn="07836931-BC80-8A9F-44C5-695194D284BA"/>
+</associations>
+</Column>
+</columns>
+<indexes itemClass="oracle.dbtools.crest.model.design.relational.Index">
+<ind_PK_UK id="308924A3-46F9-3986-A2DB-7D9F11AFEBD5" name="VEHICULES_PK">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>VEHICULES_PK</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<pk>true</pk>
+<indexState>Primary Constraint</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="DF6BEB5A-14DD-2039-4252-6786B6C56A71"/>
+</indexColumnUsage>
+</ind_PK_UK>
+<ind_PK_UK id="6AD8D54A-A949-7E8D-324F-7881E2A1971E" schemaObject="1130CFE9-3DCC-6209-71A8-7D2CB765A4D3" name="VEHICULES_PK">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>VEHICULES_PK</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<indexState>Unique Plain Index</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="DF6BEB5A-14DD-2039-4252-6786B6C56A71"/>
+</indexColumnUsage>
+</ind_PK_UK>
+<ind_PK_UK id="E004FB68-9AE2-EC0A-D28A-668C31B4B88A" name="FK_RES">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<indexState>Foreign Key</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="1AFF8779-644E-375D-4C31-62F2F270C1D3"/>
+</indexColumnUsage>
+</ind_PK_UK>
+</indexes>
+</Table>

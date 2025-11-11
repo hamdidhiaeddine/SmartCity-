@@ -1,0 +1,130 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<Table class="oracle.dbtools.crest.model.design.relational.Table" directorySegmentName="seg_0" id="C84311F4-8404-89A6-DE93-261505B15E03" schemaObject="1130CFE9-3DCC-6209-71A8-7D2CB765A4D3" name="MAISON">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>MAISON</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<allowColumnReorder>false</allowColumnReorder>
+<existDependencyGenerateInDDl>true</existDependencyGenerateInDDl>
+<parsed>true</parsed>
+<columns itemClass="oracle.dbtools.crest.model.design.relational.Column">
+<Column name="ID_MAISON" id="3464FD51-151F-0859-A6F6-DAEEF575D87B">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>MAISON</sourceObjSchema>
+<sourceObjName>ID_MAISON</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT019</logicalDatatype>
+<ownDataTypeParameters>,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="ADRESSE" id="967BBA88-88E0-6100-E972-33706999E77C">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>MAISON</sourceObjSchema>
+<sourceObjName>ADRESSE</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT024</logicalDatatype>
+<dataTypeSize>20 BYTE</dataTypeSize>
+<ownDataTypeParameters>20 BYTE,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="STATUT" id="886BFAAA-3E35-AA5D-241B-AAB369ECADD3">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>MAISON</sourceObjSchema>
+<sourceObjName>STATUT</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT024</logicalDatatype>
+<dataTypeSize>20 BYTE</dataTypeSize>
+<ownDataTypeParameters>20 BYTE,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="SECURITE" id="14BE23F1-1229-A804-593B-CC87DED2B74C">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>MAISON</sourceObjSchema>
+<sourceObjName>SECURITE</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT024</logicalDatatype>
+<dataTypeSize>20 BYTE</dataTypeSize>
+<ownDataTypeParameters>20 BYTE,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="NBR_PIECES" id="09A95CF0-C1FE-DD29-969F-94A9C8B97BD2">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>MAISON</sourceObjSchema>
+<sourceObjName>NBR_PIECES</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT019</logicalDatatype>
+<ownDataTypeParameters>,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+<Column name="TYPE" id="157F57EB-B8EE-B44F-39F4-A61284734001">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>MAISON</sourceObjSchema>
+<sourceObjName>TYPE</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<nullsAllowed>true</nullsAllowed>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT024</logicalDatatype>
+<dataTypeSize>20 BYTE</dataTypeSize>
+<ownDataTypeParameters>20 BYTE,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+</Column>
+</columns>
+<indexes itemClass="oracle.dbtools.crest.model.design.relational.Index">
+<ind_PK_UK id="4169E6AA-2410-E45A-B00B-5E3EF3FEF7F6" name="MAISON_PK">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>MAISON_PK</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<pk>true</pk>
+<indexState>Primary Constraint</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="3464FD51-151F-0859-A6F6-DAEEF575D87B"/>
+</indexColumnUsage>
+</ind_PK_UK>
+<ind_PK_UK id="E386E93D-2CB1-17C8-0978-86968904CEBF" schemaObject="1130CFE9-3DCC-6209-71A8-7D2CB765A4D3" name="MAISON_PK">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>MAISON_PK</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<indexState>Unique Plain Index</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="3464FD51-151F-0859-A6F6-DAEEF575D87B"/>
+</indexColumnUsage>
+</ind_PK_UK>
+</indexes>
+</Table>

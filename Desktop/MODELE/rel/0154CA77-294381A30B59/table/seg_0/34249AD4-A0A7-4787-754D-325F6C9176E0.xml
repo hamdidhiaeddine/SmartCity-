@@ -1,0 +1,97 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<Table class="oracle.dbtools.crest.model.design.relational.Table" directorySegmentName="seg_0" id="34249AD4-A0A7-4787-754D-325F6C9176E0" schemaObject="1130CFE9-3DCC-6209-71A8-7D2CB765A4D3" name="AVOIR">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>AVOIR</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<allowColumnReorder>false</allowColumnReorder>
+<existDependencyGenerateInDDl>true</existDependencyGenerateInDDl>
+<parsed>true</parsed>
+<columns itemClass="oracle.dbtools.crest.model.design.relational.Column">
+<Column name="ID_RES" id="22FEE71B-71E5-AD98-28EB-AD6D41F1FCBB">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>AVOIR</sourceObjSchema>
+<sourceObjName>ID_RES</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT019</logicalDatatype>
+<ownDataTypeParameters>,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+<associations>
+<colAssociation fkAssociation="ED41623F-1108-F151-58CA-B2313DCEFC45" referredColumn="07836931-BC80-8A9F-44C5-695194D284BA"/>
+</associations>
+</Column>
+<Column name="ID_MAI" id="896BFCC6-B327-379F-F58D-68CB4AE14AE1">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>AVOIR</sourceObjSchema>
+<sourceObjName>ID_MAI</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT019</logicalDatatype>
+<ownDataTypeParameters>,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+<associations>
+<colAssociation fkAssociation="92FC89D1-9A31-D57E-35CC-39881EF22CF8" referredColumn="3464FD51-151F-0859-A6F6-DAEEF575D87B"/>
+</associations>
+</Column>
+</columns>
+<indexes itemClass="oracle.dbtools.crest.model.design.relational.Index">
+<ind_PK_UK id="E39EFBE2-8B21-8150-EBA6-4B7DC5934EF0" name="AVOIR_PK">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>AVOIR_PK</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<pk>true</pk>
+<indexState>Primary Constraint</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="22FEE71B-71E5-AD98-28EB-AD6D41F1FCBB"/>
+<colUsage columnID="896BFCC6-B327-379F-F58D-68CB4AE14AE1"/>
+</indexColumnUsage>
+</ind_PK_UK>
+<ind_PK_UK id="C56D2EE2-86C3-8DEF-E5CD-E67EBB5341E0" schemaObject="1130CFE9-3DCC-6209-71A8-7D2CB765A4D3" name="AVOIR_PK">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>AVOIR_PK</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<indexState>Unique Plain Index</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="22FEE71B-71E5-AD98-28EB-AD6D41F1FCBB"/>
+<colUsage columnID="896BFCC6-B327-379F-F58D-68CB4AE14AE1"/>
+</indexColumnUsage>
+</ind_PK_UK>
+<ind_PK_UK id="A538356B-3EA2-F259-5D4F-0ACAEE86868A" name="FK_MAI">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<indexState>Foreign Key</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="896BFCC6-B327-379F-F58D-68CB4AE14AE1"/>
+</indexColumnUsage>
+</ind_PK_UK>
+<ind_PK_UK id="2BBF7EB9-3EE9-0FAB-ADD6-4E8C3EE9E2C4" name="FK_RM">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<indexState>Foreign Key</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="22FEE71B-71E5-AD98-28EB-AD6D41F1FCBB"/>
+</indexColumnUsage>
+</ind_PK_UK>
+</indexes>
+</Table>

@@ -1,0 +1,97 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<Table class="oracle.dbtools.crest.model.design.relational.Table" directorySegmentName="seg_0" id="57A107E1-84AA-6A15-B733-7DF6485B4169" schemaObject="1130CFE9-3DCC-6209-71A8-7D2CB765A4D3" name="ACCEDER">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>ACCEDER</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<allowColumnReorder>false</allowColumnReorder>
+<existDependencyGenerateInDDl>true</existDependencyGenerateInDDl>
+<parsed>true</parsed>
+<columns itemClass="oracle.dbtools.crest.model.design.relational.Column">
+<Column name="ID_RES" id="5C62EAFD-5F50-8794-0975-D99AF0AF5A2B">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>ACCEDER</sourceObjSchema>
+<sourceObjName>ID_RES</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT019</logicalDatatype>
+<ownDataTypeParameters>,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+<associations>
+<colAssociation fkAssociation="68F79640-ECDE-F009-B029-ABEEB487360E" referredColumn="07836931-BC80-8A9F-44C5-695194D284BA"/>
+</associations>
+</Column>
+<Column name="ID_JAR" id="A7639682-A51B-FE4C-32AA-071689D8FBED">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>ACCEDER</sourceObjSchema>
+<sourceObjName>ID_JAR</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<useDomainConstraints>false</useDomainConstraints>
+<use>1</use>
+<logicalDatatype>LOGDT019</logicalDatatype>
+<ownDataTypeParameters>,,</ownDataTypeParameters>
+<autoIncrementCycle>false</autoIncrementCycle>
+<associations>
+<colAssociation fkAssociation="0703E965-AC95-1E12-F291-C72FDF8B8F33" referredColumn="33A1B3C3-409C-C1D7-1E66-F184E816E517"/>
+</associations>
+</Column>
+</columns>
+<indexes itemClass="oracle.dbtools.crest.model.design.relational.Index">
+<ind_PK_UK id="D6EAA2DE-CD06-864F-88F9-04ABEA6CEAF3" name="PK_RJ">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>PK_RJ</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<pk>true</pk>
+<indexState>Primary Constraint</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="5C62EAFD-5F50-8794-0975-D99AF0AF5A2B"/>
+<colUsage columnID="A7639682-A51B-FE4C-32AA-071689D8FBED"/>
+</indexColumnUsage>
+</ind_PK_UK>
+<ind_PK_UK id="12C99CE8-44B2-98D2-9ED3-CD45570D7697" schemaObject="1130CFE9-3DCC-6209-71A8-7D2CB765A4D3" name="PK_RJ">
+<sourceConnName>dhiaeddine</sourceConnName>
+<sourceObjSchema>SYSTEM</sourceObjSchema>
+<sourceObjName>PK_RJ</sourceObjName>
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<indexState>Unique Plain Index</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="5C62EAFD-5F50-8794-0975-D99AF0AF5A2B"/>
+<colUsage columnID="A7639682-A51B-FE4C-32AA-071689D8FBED"/>
+</indexColumnUsage>
+</ind_PK_UK>
+<ind_PK_UK id="9509A6F7-67E6-0557-2186-148F70EFE019" name="FK_JARD">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<indexState>Foreign Key</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="A7639682-A51B-FE4C-32AA-071689D8FBED"/>
+</indexColumnUsage>
+</ind_PK_UK>
+<ind_PK_UK id="0996E599-6E98-6101-BA43-C9C72E4B47F8" name="FK_RS">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<indexState>Foreign Key</indexState>
+<isSurrogateKey>false</isSurrogateKey>
+<indexColumnUsage>
+<colUsage columnID="5C62EAFD-5F50-8794-0975-D99AF0AF5A2B"/>
+</indexColumnUsage>
+</ind_PK_UK>
+</indexes>
+</Table>

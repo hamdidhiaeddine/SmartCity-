@@ -1,0 +1,96 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<TableProxyOraclev11g class="oracle.dbtools.crest.model.design.storage.oracle.v11g.TableProxyOraclev11g" name="RESIDENTS" directorySegmentName="seg_0" id="1965D13B-7241-5E25-399F-53ABC6132D89">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<schemaObject>1130CFE9-3DCC-6209-71A8-7D2CB765A4D3</schemaObject>
+<logging>YES</logging>
+<partitionedRowMovement>DISABLE</partitionedRowMovement>
+<segment>15A9ECEE-EBFC-EDFE-A422-1F692C07BA73</segment>
+<tableSpace>3A21ACE8-982A-57C9-92D9-5061C84B5047</tableSpace>
+<temporaryChanged>false</temporaryChanged>
+<accessDriverType>oracle_loader</accessDriverType>
+<rejectLimit></rejectLimit>
+<columnProxies itemClass="oracle.dbtools.crest.model.design.storage.oracle.v12c.ColumnProxyOraclev12c">
+<ColumnProxy name="ID_RESIDENT" id="07836931-BC80-8A9F-44C5-695194D284BA">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="SITUATION_FAMILILE" id="1B45045F-B4C0-CC5D-6A15-80CE72B161DC">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="TELEPHONE" id="347DBF8A-61D2-2CE7-2CD9-C5B96101E16A">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="STATUT" id="5CD1677D-54DA-43C0-8594-27D9759E22D1">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="DT_NAISSANCE" id="5F55AB2C-EA38-F5A7-2CF1-59A0986555CF">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="PRENOM" id="69557CF4-6353-D3DC-A8F7-7865D378EFE7">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="EMAIL" id="6FF62DE5-197E-B48B-6DD6-56DF5DB4F741">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="ADRESSE" id="881448D2-7811-464E-7A8A-61B10EDD80B2">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="ID_CAB" id="9EE99ED6-8CA6-71A6-287F-BA374E886324">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+<ColumnProxy name="NOM" id="ED0C3245-23F1-30C0-5A98-FA1EC58B8A1E">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ColumnProxy>
+</columnProxies>
+<indexProxies>
+<IndexProxy class="oracle.dbtools.crest.model.design.storage.oracle.v10g.IndexProxyOraclev10g" name="PK_RES" id="EF942CA4-CA5A-C86B-D0E1-E5273DA79763">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<schemaObject>1130CFE9-3DCC-6209-71A8-7D2CB765A4D3</schemaObject>
+<segment>5ABA8252-9259-8EE6-8192-9FBD65AE21DB</segment>
+<tableSpace>3A21ACE8-982A-57C9-92D9-5061C84B5047</tableSpace>
+</IndexProxy>
+</indexProxies>
+<foreignKeys>
+<ForeignKey class="oracle.dbtools.crest.model.design.storage.oracle.v10g.FKProxyOraclev10g" name="FK_CAB" id="EFEAFAC2-68A2-7C05-CA8B-A51FEC9678CE">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+</ForeignKey>
+</foreignKeys>
+<primaryKeys>
+<PrimaryKey class="oracle.dbtools.crest.model.design.storage.oracle.v10g.PKProxyOraclev10g" name="PK_RES" id="DBF9A98D-8647-EC3F-8DDD-191C1CC025EE">
+<createdBy>hamdi</createdBy>
+<createdTime>2025-11-11 18:20:09 UTC</createdTime>
+<ownerDesignName>MODELE</ownerDesignName>
+<segment>5ABA8252-9259-8EE6-8192-9FBD65AE21DB</segment>
+<tableSpace>3A21ACE8-982A-57C9-92D9-5061C84B5047</tableSpace>
+<existingIndex>EF942CA4-CA5A-C86B-D0E1-E5273DA79763</existingIndex>
+<indexSegment>5ABA8252-9259-8EE6-8192-9FBD65AE21DB</indexSegment>
+<indexSort>SORTED</indexSort>
+<usingIndex>BY INDEX NAME</usingIndex>
+</PrimaryKey>
+</primaryKeys>
+</TableProxyOraclev11g>
