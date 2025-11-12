@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+<<<<<<< HEAD
 #include <QTableWidget>
 #include <QMessageBox>
 #include <QMap>
@@ -10,6 +11,8 @@
 #include "resident.h"
 #include <QtCharts/QChartView>
 
+=======
+>>>>>>> ca35564c4967a2d463a1f10ffb114ccf76ef4dbf
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -18,12 +21,16 @@ QT_END_NAMESPACE
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
+<<<<<<< HEAD
 
+=======
+>>>>>>> ca35564c4967a2d463a1f10ffb114ccf76ef4dbf
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
 private slots:
+<<<<<<< HEAD
     void onGestionEmployes();
     void onGestionVehicules();
     void onGestionResidents();
@@ -92,6 +99,17 @@ private:
     };
     QVector<VehiculeData> m_allVehicules;
     QLineEdit *m_rechercheVehiculeLineEdit = nullptr;
+=======
+    void showEmployees();
+    void showVehicules();
+    void showResidents();
+    void showMaisons();
+    void showJardins();
+    void showCabinets();
+
+private:
+    Ui::MainWindow *ui;
+>>>>>>> ca35564c4967a2d463a1f10ffb114ccf76ef4dbf
 };
 
 #endif // MAINWINDOW_H

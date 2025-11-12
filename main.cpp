@@ -1,12 +1,18 @@
 #include "mainwindow.h"
+<<<<<<< HEAD
 #include "authetification.h"
 #include <QApplication>
 #include <QMessageBox>
 #include "connection.h"
+=======
+
+#include <QApplication>
+>>>>>>> ca35564c4967a2d463a1f10ffb114ccf76ef4dbf
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+<<<<<<< HEAD
     
     // Étape 1: Vérifier la connexion à la base de données
     Connection c;
@@ -37,5 +43,9 @@ int main(int argc, char *argv[])
                                          "Bienvenue dans l'application."), 
                              QMessageBox::Ok);
 
+=======
+    MainWindow w;
+    w.show();
+>>>>>>> ca35564c4967a2d463a1f10ffb114ccf76ef4dbf
     return a.exec();
 }
