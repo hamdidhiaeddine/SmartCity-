@@ -1,0 +1,10 @@
+debug/main.o
+debug/mainwindow.o
+debug/connection.o
+debug/Employee.o
+debug/InputController.o
+debug/authetification.o
+debug/vehicule.o
+debug/qrc_resources.o
+debug/moc_mainwindow.o
+debug/moc_authetification.o
