@@ -2,6 +2,7 @@
 #define EMPLOYEE_H
 
 #include <QString>
+#include <QMap>
 
 struct Employee
 {
@@ -19,6 +20,9 @@ struct Employee
     bool updateById(int id, QString &errorText) const;         // update
     static bool removeById(int id, QString &errorText);        // delete
     static QVector<Employee> fetchAll(QString &errorText);     // read (list)
+    
+    // Statistiques par poste
+    static QMap<QString, int> getStatistiquesParPoste(QString &errorText);  // Retourne un map: poste -> nombre d'employés
 };
 
 struct EmployeeFilter

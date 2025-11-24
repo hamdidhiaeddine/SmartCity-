@@ -2,6 +2,8 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QVariant>
+#include <QMap>
+#include <QDebug>
 
 /*static void tryDisableFk()
 {
@@ -185,6 +187,31 @@ QVector<Employee> Employee::fetchAll(QString &errorText)
     }
     qDebug() << "fetchAll: rows loaded =" << count;
     return items;
+}
+
+QMap<QString, int> Employee::getStatistiquesParPoste(QString &errorText)
+{
+    QMap<QString, int> stats;
+    QSqlQuery q;
+    q.setForwardOnly(true);
+    
+    // Requête SQL pour compter les employés par poste
+    q.prepare("SELECT \"POSTE\", COUNT(*) FROM \"SYSTEM\".\"EMPLOYES\" GROUP BY \"POSTE\" ORDER BY \"POSTE\"");
+    
+    if (!q.exec()) {
+        errorText = q.lastError().text();
+        qDebug() << "Erreur statistiques par poste:" << errorText;
+        return stats;
+    }
+    
+    while (q.next()) {
+        QString poste = q.value(0).toString();
+        int count = q.value(1).toInt();
+        stats[poste] = count;
+        qDebug() << "Poste:" << poste << "-> Nombre:" << count;
+    }
+    
+    return stats;
 }
 
 
