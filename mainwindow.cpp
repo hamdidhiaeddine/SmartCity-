@@ -99,6 +99,11 @@ void MainWindow::connectButtons()
     connect(ui->modifier, &QPushButton::clicked, this, &MainWindow::onModifierEmploye);
     connect(ui->supprimer,&QPushButton::clicked, this, &MainWindow::onSupprimerEmploye);
     connect(ui->exporter, &QPushButton::clicked, this, &MainWindow::onExporterPDF);
+    
+    // Statistiques Employés
+    if (ui->stat_emp) {
+        connect(ui->stat_emp, &QPushButton::clicked, this, &MainWindow::onStatistiqueEmploye);
+    }
 
     // CRUD Véhicules (connexion manuelle uniquement, pas de connexion automatique)
     connect(ui->ajouter_3, &QPushButton::clicked, this, &MainWindow::onAjouterVehicule);
@@ -726,6 +731,112 @@ void MainWindow::onTriEmailChanged()
 void MainWindow::onTriSalaireChanged()
 {
     appliquerRechercheEtTri();
+}
+
+void MainWindow::onStatistiqueEmploye()
+{
+    // Récupérer les statistiques par poste
+    QString errorText;
+    QMap<QString, int> stats = Employee::getStatistiquesParPoste(errorText);
+    
+    if (!errorText.isEmpty()) {
+        QMessageBox::warning(this, tr("Erreur"), 
+                           tr("Erreur lors de la récupération des statistiques:\n%1").arg(errorText));
+        return;
+    }
+    
+    if (stats.isEmpty()) {
+        QMessageBox::information(this, tr("Information"), 
+                                tr("Aucune donnée disponible pour les statistiques."));
+        return;
+    }
+    
+    // Créer la série de données pour le graphique en camembert
+    QPieSeries* series = new QPieSeries();
+    
+    // Calculer le total
+    int total = 0;
+    for (auto it = stats.begin(); it != stats.end(); ++it) {
+        total += it.value();
+    }
+    
+    // Créer les tranches du graphique
+    for (auto it = stats.begin(); it != stats.end(); ++it) {
+        QString poste = it.key();
+        int count = it.value();
+        double perc = (total > 0) ? (double(count) / total) * 100.0 : 0.0;
+        
+        QString label = QString("%1\n%2 employé(s) (%3%)")
+                            .arg(poste)
+                            .arg(count)
+                            .arg(QString::number(perc, 'f', 1));
+        
+        QPieSlice* slice = series->append(label, count);
+        slice->setLabelVisible(true);
+        slice->setLabelPosition(QPieSlice::LabelOutside);
+        slice->setLabelFont(QFont("Arial", 10, QFont::Bold));
+        
+        // Couleur aléatoire pour chaque tranche
+        QColor color = QColor::fromHsv(QRandomGenerator::global()->bounded(360), 200, 250);
+        slice->setBrush(color);
+        
+        // Effet d'animation au survol
+        QObject::connect(slice, &QPieSlice::hovered, [slice](bool hovered) {
+            if (hovered) {
+                slice->setExploded(true);
+                slice->setExplodeDistanceFactor(0.15);
+                slice->setLabelFont(QFont("Arial", 11, QFont::Bold));
+            } else {
+                slice->setExploded(false);
+                slice->setLabelFont(QFont("Arial", 10, QFont::Normal));
+            }
+        });
+    }
+    
+    // Créer le graphique
+    QChart* chart = new QChart();
+    chart->addSeries(series);
+    chart->setTitle("Répartition des employés par poste");
+    chart->setTitleFont(QFont("Arial", 16, QFont::Bold));
+    chart->legend()->setAlignment(Qt::AlignBottom);
+    chart->legend()->setFont(QFont("Arial", 9));
+    chart->setAnimationOptions(QChart::AllAnimations);
+    chart->setTheme(QChart::ChartThemeLight);
+    
+    // Créer la vue du graphique
+    QChartView* chartView = new QChartView(chart);
+    chartView->setRenderHint(QPainter::Antialiasing);
+    
+    // Bouton de fermeture
+    QPushButton* closeButton = new QPushButton("Fermer");
+    closeButton->setFixedWidth(120);
+    closeButton->setStyleSheet(
+        "QPushButton { background-color: #f44336; color: white; border-radius: 8px; padding: 8px; font-size: 12px; font-weight: bold; }"
+        "QPushButton:hover { background-color: #d32f2f; }"
+    );
+    
+    // Créer le dialogue
+    QDialog* dialog = new QDialog(this);
+    dialog->setWindowTitle("Statistiques des employés par poste");
+    dialog->resize(900, 700);
+    dialog->setModal(true);
+    
+    QVBoxLayout* layout = new QVBoxLayout(dialog);
+    layout->addWidget(chartView);
+    layout->addWidget(closeButton, 0, Qt::AlignCenter);
+    
+    // Connecter le bouton de fermeture
+    QObject::connect(closeButton, &QPushButton::clicked, dialog, &QDialog::accept);
+    
+    // Centrer le dialogue sur la fenêtre principale
+    QRect parentRect = this->geometry();
+    int x = parentRect.center().x() - dialog->width() / 2;
+    int y = parentRect.center().y() - dialog->height() / 2;
+    dialog->move(x, y);
+    
+    // Afficher le dialogue
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
 }
 
 // === Véhicules CRUD ===

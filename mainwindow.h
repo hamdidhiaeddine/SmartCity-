@@ -41,6 +41,7 @@ private slots:
     void onRechercheChanged();
     void onTriEmailChanged();
     void onTriSalaireChanged();
+    void onStatistiqueEmploye();
     // Véhicules recherche et tri
     void onRechercheVehiculeChanged();
     void onTriTypeChanged();

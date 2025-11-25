@@ -12,10 +12,7 @@
 #include <QFileDialog>
 #include <QFile>
 #include <QDir>
-#include <QImage>
-#include <QBuffer>
 #include <QDebug>
-#include <QCryptographicHash>
 #include <QCamera>
 #include <QVideoWidget>
 #include <QImageCapture>
@@ -24,6 +21,9 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDateTime>
+#include <QBuffer>
+#include <QCryptographicHash>
+#include <QTimer>
 
 AUTHETIFICATION::AUTHETIFICATION(QWidget *parent)
     : QDialog(parent)
@@ -103,11 +103,18 @@ AUTHETIFICATION::AUTHETIFICATION(QWidget *parent)
         connect(btnConnexion, &QPushButton::clicked, this, &AUTHETIFICATION::onConnexion);
     }
     
-    // Connecter le bouton Face ID
+    // Bouton Face ID
     QPushButton *btnFaceID = findChild<QPushButton*>("add_employee_btn_4");
     if (btnFaceID) {
         connect(btnFaceID, &QPushButton::clicked, this, &AUTHETIFICATION::onFaceID);
     }
+    
+    // Vérifier si un Face ID est déjà enregistré et lancer la reconnaissance automatiquement
+    QTimer::singleShot(500, this, [this]() {
+        if (hasFaceIDRegistered()) {
+            recognizeFaceID();
+        }
+    });
 }
 
 AUTHETIFICATION::~AUTHETIFICATION()
@@ -157,11 +164,26 @@ void AUTHETIFICATION::onConnexion()
     effacerErreur("identifiant");
     effacerErreur("motDePasse");
     
-    // Ici, vous pouvez ajouter la logique de connexion réelle
-    // (vérification des identifiants dans la base de données, etc.)
-    // Pour l'instant, on accepte juste le dialogue si la validation est OK
-    // Le message de succès sera affiché dans main.cpp après accept()
+    // Vérifier les identifiants : admin / admin123
+    QString identifiant = result.normalizedIdentifiant;
+    QString motDePasse = input.motDePasse;
     
+    const QString ADMIN_USERNAME = "admin";
+    const QString ADMIN_PASSWORD = "admin123";
+    
+    if (identifiant != ADMIN_USERNAME || motDePasse != ADMIN_PASSWORD) {
+        QMessageBox::warning(this, "Erreur d'authentification", 
+                           "Identifiant ou mot de passe incorrect.\n\n"
+                           "Veuillez réessayer.");
+        // Effacer le champ mot de passe pour sécurité
+        if (lineEdit_2) {
+            lineEdit_2->clear();
+        }
+        return;
+    }
+    
+    // Authentification réussie
+    qDebug() << "✅ [AUTH] Connexion réussie pour l'utilisateur: admin";
     accept(); // Ferme le dialogue avec succès (retourne QDialog::Accepted)
 }
 
@@ -245,475 +267,476 @@ void AUTHETIFICATION::effacerErreur(const QString &champ)
     }
 }
 
-// Vérifier si un Face ID est déjà enregistré
-bool AUTHETIFICATION::hasFaceIDRegistered()
+// ========== FACE ID IMPLEMENTATION ==========
+
+void AUTHETIFICATION::onFaceID()
 {
-    // Vérifier d'abord si la table existe
-    if (!tableFaceIDExists()) {
-        return false;
+    // Si un Face ID existe déjà, faire la reconnaissance
+    if (hasFaceIDRegistered()) {
+        recognizeFaceID();
+    } else {
+        // Sinon, enregistrer un nouveau Face ID
+        startFaceIDRegistration();
     }
-    
-    QSqlQuery query;
-    query.prepare("SELECT COUNT(*) FROM \"SYSTEM\".\"FACE_ID\"");
-    if (!query.exec()) {
-        qDebug() << "Erreur lors de la vérification Face ID:" << query.lastError().text();
-        return false;
-    }
-    if (query.next()) {
-        return query.value(0).toInt() > 0;
-    }
-    return false;
 }
 
-// Vérifier si la table FACE_ID existe
-bool AUTHETIFICATION::tableFaceIDExists()
+void AUTHETIFICATION::startFaceIDRegistration()
 {
-    QSqlQuery query;
-    query.prepare("SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = 'FACE_ID'");
-    if (!query.exec()) {
-        // Essayer une autre méthode pour Oracle
-        query.prepare("SELECT COUNT(*) FROM ALL_TABLES WHERE OWNER = 'SYSTEM' AND TABLE_NAME = 'FACE_ID'");
-        if (!query.exec()) {
-            return false;
+    // Vérifier si une caméra est disponible
+    QList<QCameraDevice> cameras = QMediaDevices::videoInputs();
+    if (cameras.isEmpty()) {
+        QMessageBox::warning(this, "Erreur", "Aucune caméra détectée.\nVeuillez connecter une caméra et réessayer.");
+        return;
+    }
+    
+    // Créer un dialogue modal pour la capture
+    QDialog *captureDialog = new QDialog(this);
+    captureDialog->setWindowTitle("Enregistrement Face ID");
+    captureDialog->setModal(true);
+    captureDialog->resize(640, 480);
+    
+    QVBoxLayout *layout = new QVBoxLayout(captureDialog);
+    
+    // Widget vidéo pour afficher le flux de la caméra
+    QVideoWidget *videoWidget = new QVideoWidget(captureDialog);
+    layout->addWidget(videoWidget);
+    
+    // Boutons
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    QPushButton *btnCapture = new QPushButton("Capturer", captureDialog);
+    QPushButton *btnCancel = new QPushButton("Annuler", captureDialog);
+    buttonLayout->addWidget(btnCapture);
+    buttonLayout->addWidget(btnCancel);
+    layout->addLayout(buttonLayout);
+    
+    // Configurer la caméra
+    QCamera *camera = new QCamera(cameras.first(), captureDialog);
+    QImageCapture *imageCapture = new QImageCapture(captureDialog);
+    QMediaCaptureSession *captureSession = new QMediaCaptureSession(captureDialog);
+    
+    captureSession->setCamera(camera);
+    captureSession->setImageCapture(imageCapture);
+    captureSession->setVideoOutput(videoWidget);
+    
+    // Variables pour stocker l'image capturée (utiliser QPointer pour éviter les problèmes de scope)
+    QImage *capturedImagePtr = new QImage();
+    bool *imageCapturedPtr = new bool(false);
+    
+    // Connecter le signal de capture
+    connect(imageCapture, &QImageCapture::imageCaptured, captureDialog, [=](int /*id*/, const QImage &img) {
+        *capturedImagePtr = img;
+        *imageCapturedPtr = true;
+        qDebug() << "✅ Image capturée, taille:" << img.size();
+    });
+    
+    // Connecter le signal d'erreur
+    connect(imageCapture, &QImageCapture::errorOccurred, captureDialog, [=](int /*id*/, QImageCapture::Error /*error*/, const QString &errorString) {
+        qDebug() << "❌ Erreur capture:" << errorString;
+        QMessageBox::warning(captureDialog, "Erreur", "Erreur lors de la capture: " + errorString);
+    });
+    
+    // Connecter le bouton de capture
+    connect(btnCapture, &QPushButton::clicked, captureDialog, [=]() {
+        *imageCapturedPtr = false;
+        int id = imageCapture->capture();
+        if (id == -1) {
+            QMessageBox::warning(captureDialog, "Erreur", "Impossible de démarrer la capture.");
+            return;
         }
-    }
-    if (query.next()) {
-        return query.value(0).toInt() > 0;
-    }
-    return false;
-}
-
-// Sauvegarder un nouveau Face ID
-bool AUTHETIFICATION::saveFaceID(const QString &faceHash)
-{
-    // Vérifier si la table existe
-    if (!tableFaceIDExists()) {
-        qDebug() << "La table FACE_ID n'existe pas. Veuillez exécuter le script create_faceid_table.sql";
-        return false;
-    }
+        // Attendre un peu pour que l'image soit capturée
+        QTimer::singleShot(1000, captureDialog, [=]() {
+            if (*imageCapturedPtr && !capturedImagePtr->isNull()) {
+                captureDialog->accept();
+            } else {
+                QMessageBox::warning(captureDialog, "Erreur", "Échec de la capture. Veuillez réessayer.");
+            }
+        });
+    });
     
-    QSqlQuery query;
-    // Supprimer l'ancien Face ID s'il existe (un seul Face ID par système)
-    query.prepare("DELETE FROM \"SYSTEM\".\"FACE_ID\"");
-    if (!query.exec()) {
-        // Ignorer l'erreur si la table est vide (c'est normal)
-        QString errorText = query.lastError().text();
-        if (!errorText.contains("table", Qt::CaseInsensitive) && 
-            !errorText.contains("does not exist", Qt::CaseInsensitive)) {
-            qDebug() << "Avertissement lors de la suppression de l'ancien Face ID:" << errorText;
-        }
-    }
+    // Connecter le bouton d'annulation
+    connect(btnCancel, &QPushButton::clicked, captureDialog, &QDialog::reject);
     
-    // Insérer le nouveau Face ID
-    query.prepare("INSERT INTO \"SYSTEM\".\"FACE_ID\" (FACE_HASH, DATE_CREATION) VALUES (:hash, SYSDATE)");
-    query.bindValue(":hash", faceHash);
+    // Démarrer la caméra
+    camera->start();
     
-    if (!query.exec()) {
-        QSqlError error = query.lastError();
-        qDebug() << "Erreur lors de la sauvegarde Face ID:";
-        qDebug() << "  - Texte:" << error.text();
-        qDebug() << "  - Code natif:" << error.nativeErrorCode();
-        qDebug() << "  - Driver:" << error.driverText();
-        qDebug() << "  - Database:" << error.databaseText();
-        return false;
-    }
-    return true;
-}
-
-// Calculer la distance de Hamming entre deux hashs (nombre de bits différents)
-int AUTHETIFICATION::hammingDistance(const QString &hash1, const QString &hash2)
-{
-    if (hash1.length() != hash2.length()) {
-        return -1; // Longueurs différentes
-    }
+    // Attendre la fermeture du dialogue
+    int result = captureDialog->exec();
     
-    int distance = 0;
-    for (int i = 0; i < hash1.length(); i++) {
-        if (hash1[i] != hash2[i]) {
-            distance++;
-        }
-    }
-    return distance;
-}
-
-// Vérifier un Face ID existant avec tolérance améliorée
-bool AUTHETIFICATION::verifyFaceID(const QString &faceHash)
-{
-    QSqlQuery query;
-    query.prepare("SELECT FACE_HASH FROM \"SYSTEM\".\"FACE_ID\"");
-    
-    if (!query.exec()) {
-        qDebug() << "Erreur lors de la vérification Face ID:" << query.lastError().text();
-        return false;
-    }
-    
-    if (query.next()) {
-        QString storedHash = query.value(0).toString();
+    if (result == QDialog::Accepted && *imageCapturedPtr && !capturedImagePtr->isNull()) {
+        // Normaliser l'image
+        QImage normalized = normalizeFaceImage(*capturedImagePtr);
         
-        // Comparaison exacte d'abord
-        if (storedHash == faceHash) {
-            // Mettre à jour la date de dernière utilisation
-            QSqlQuery updateQuery;
-            updateQuery.prepare("UPDATE \"SYSTEM\".\"FACE_ID\" SET DATE_DERNIERE_UTILISATION = SYSDATE WHERE FACE_HASH = :hash");
-            updateQuery.bindValue(":hash", storedHash);
-            updateQuery.exec();
-            qDebug() << "Face ID reconnu (correspondance exacte)";
-            return true;
-        }
+        // Générer la signature
+        QString signature = generateFaceSignature(normalized);
         
-        // Si pas de correspondance exacte, calculer la distance de Hamming
-        int distance = hammingDistance(storedHash, faceHash);
-        qDebug() << "Distance de Hamming:" << distance << "sur" << storedHash.length() << "caractères";
-        
-        // Tolérance beaucoup plus élevée : 30% de différence acceptée
-        // La nouvelle signature basée sur les moyennes de blocs est plus stable
-        int tolerance = (storedHash.length() * 3) / 10; // 30%
-        if (distance <= tolerance) {
-            qDebug() << "Face ID reconnu (correspondance avec tolérance:" << tolerance << ")";
-            // Mettre à jour la date de dernière utilisation
-            QSqlQuery updateQuery;
-            updateQuery.prepare("UPDATE \"SYSTEM\".\"FACE_ID\" SET DATE_DERNIERE_UTILISATION = SYSDATE WHERE FACE_HASH = :hash");
-            updateQuery.bindValue(":hash", storedHash);
-            updateQuery.exec();
-            return true;
+        // Sauvegarder dans la base de données
+        if (saveFaceID(signature)) {
+            QMessageBox::information(this, "Succès", "Face ID enregistré avec succès !");
         } else {
-            qDebug() << "Face ID non reconnu - Distance:" << distance << "> tolerance:" << tolerance;
-            qDebug() << "Signature stockée (premiers 20):" << storedHash.left(20);
-            qDebug() << "Signature capturée (premiers 20):" << faceHash.left(20);
+            QMessageBox::warning(this, "Erreur", "Échec de l'enregistrement du Face ID dans la base de données.");
         }
     }
-    return false;
+    
+    // Nettoyer
+    camera->stop();
+    delete capturedImagePtr;
+    delete imageCapturedPtr;
+    delete captureDialog;
 }
 
-// Normaliser l'image faciale pour la comparaison
 QImage AUTHETIFICATION::normalizeFaceImage(const QImage &image)
 {
-    // 1. Redimensionner à une taille fixe (réduit l'impact de la distance)
-    QImage normalized = image.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    // Redimensionner à 200x200
+    QImage resized = image.scaled(200, 200, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
     
-    // 2. Convertir en niveaux de gris (réduit l'impact de l'éclairage)
-    QImage grayscale = normalized.convertToFormat(QImage::Format_Grayscale8);
+    // Convertir en niveaux de gris
+    QImage grayscale = resized.convertToFormat(QImage::Format_Grayscale8);
     
-    // 3. Redimensionner à une taille plus petite pour réduire les variations
-    QImage final = grayscale.scaled(50, 50, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    // Appliquer un flou moyen (filtre 3x3)
+    QImage blurred = grayscale;
+    for (int y = 1; y < blurred.height() - 1; y++) {
+        for (int x = 1; x < blurred.width() - 1; x++) {
+            int sum = 0;
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    sum += qGray(grayscale.pixel(x + dx, y + dy));
+                }
+            }
+            blurred.setPixel(x, y, qRgb(sum / 9, sum / 9, sum / 9));
+        }
+    }
     
-    return final;
+    return blurred;
 }
 
-// Générer une signature simplifiée de l'image (basée sur les valeurs moyennes de régions)
-QString AUTHETIFICATION::generateFaceHash(const QImage &image)
+QString AUTHETIFICATION::generateFaceSignature(const QImage &image)
 {
-    QImage normalized = normalizeFaceImage(image);
+    // Diviser l'image en blocs de 20x20 pixels
+    const int blockSize = 20;
+    const int blocksX = image.width() / blockSize;
+    const int blocksY = image.height() / blockSize;
     
-    // Créer une signature basée sur les valeurs moyennes de blocs 10x10
-    // Cela crée une signature plus tolérante aux variations
-    QString signature;
-    int blockSize = 10;
-    int width = normalized.width();
-    int height = normalized.height();
+    QByteArray signatureData;
     
-    for (int by = 0; by < height; by += blockSize) {
-        for (int bx = 0; bx < width; bx += blockSize) {
+    // Calculer la valeur moyenne de chaque bloc
+    for (int by = 0; by < blocksY; by++) {
+        for (int bx = 0; bx < blocksX; bx++) {
             int sum = 0;
             int count = 0;
             
-            for (int y = by; y < qMin(by + blockSize, height); y++) {
-                for (int x = bx; x < qMin(bx + blockSize, width); x++) {
-                    sum += qGray(normalized.pixel(x, y));
+            for (int y = by * blockSize; y < (by + 1) * blockSize && y < image.height(); y++) {
+                for (int x = bx * blockSize; x < (bx + 1) * blockSize && x < image.width(); x++) {
+                    sum += qGray(image.pixel(x, y));
                     count++;
                 }
             }
             
             if (count > 0) {
-                int avg = sum / count;
-                // Normaliser à une valeur entre 0-15 (hex)
-                int normalizedValue = (avg * 15) / 255;
-                signature += QString::number(normalizedValue, 16);
+                quint8 avg = sum / count;
+                signatureData.append(avg);
             }
         }
     }
     
-    return signature;
+    // Générer un hash SHA256 de la signature
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    hash.addData(signatureData);
+    QString hashString = hash.result().toHex();
+    
+    // Créer une signature binaire simple basée sur les valeurs moyennes
+    QString binarySignature;
+    for (int i = 0; i < signatureData.size(); i++) {
+        quint8 val = signatureData[i];
+        binarySignature += (val > 128) ? '1' : '0';
+    }
+    
+    // Retourner hash + signature binaire
+    return hashString + "_" + binarySignature;
 }
 
-void AUTHETIFICATION::onFaceID()
+bool AUTHETIFICATION::saveFaceID(const QString &signature)
 {
-    // Vérifier si un Face ID est déjà enregistré
-    bool faceIDExists = hasFaceIDRegistered();
+    QSqlQuery query;
     
-    // Mode : enregistrement (false) ou reconnaissance (true)
-    bool isRecognitionMode = faceIDExists;
-    // Créer un dialogue pour la reconnaissance faciale avec caméra
-    QDialog *faceIDDialog = new QDialog(this);
-    QString dialogTitle = isRecognitionMode 
-        ? "Face ID - Reconnaissance"
-        : "Face ID - Enregistrement";
-    faceIDDialog->setWindowTitle(dialogTitle);
-    faceIDDialog->setModal(true);
-    faceIDDialog->resize(800, 600);
+    // Vérifier la longueur de la signature
+    if (signature.length() > 500) {
+        qDebug() << "❌ Signature trop longue:" << signature.length() << "caractères (max 500)";
+        QMessageBox::warning(this, "Erreur", 
+                           "La signature générée est trop longue (" + QString::number(signature.length()) + " caractères).\n"
+                           "Veuillez réessayer.");
+        return false;
+    }
     
-    QVBoxLayout *layout = new QVBoxLayout(faceIDDialog);
+    // Vérifier d'abord si la table existe
+    query.prepare("SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = 'FACE_ID'");
+    bool tableExists = false;
+    if (query.exec() && query.next()) {
+        tableExists = (query.value(0).toInt() > 0);
+    }
     
-    // Label d'instruction (change selon le mode)
-    QString instructionText = isRecognitionMode 
-        ? "Positionnez votre visage devant la caméra pour la reconnaissance"
-        : "Enregistrez votre Face ID\nPositionnez votre visage devant la caméra";
-    QLabel *instructionLabel = new QLabel(instructionText, faceIDDialog);
-    instructionLabel->setAlignment(Qt::AlignCenter);
-    instructionLabel->setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px; color: #333;");
-    layout->addWidget(instructionLabel);
+    if (!tableExists) {
+        QMessageBox::warning(this, "Table manquante", 
+                           "La table FACE_ID n'existe pas dans la base de données.\n\n"
+                           "Veuillez exécuter le script SQL create_faceid_table.sql pour créer la table.\n\n"
+                           "Le script se trouve dans le répertoire du projet.");
+        return false;
+    }
     
-    // Zone d'affichage de la caméra (Qt 6 utilise QVideoWidget)
-    QVideoWidget *viewfinder = new QVideoWidget(faceIDDialog);
-    viewfinder->setMinimumSize(640, 480);
-    viewfinder->setStyleSheet("border: 2px solid #2196F3; background-color: #000;");
-    layout->addWidget(viewfinder);
+    // Supprimer l'ancien enregistrement s'il existe
+    query.prepare("DELETE FROM \"SYSTEM\".\"FACE_ID\"");
+    query.exec(); // Ignorer les erreurs
     
-    // Zone d'affichage de l'image capturée (cachée initialement)
-    QLabel *capturedImageLabel = new QLabel(faceIDDialog);
-    capturedImageLabel->setAlignment(Qt::AlignCenter);
-    capturedImageLabel->setMinimumSize(640, 480);
-    capturedImageLabel->setStyleSheet("border: 2px solid #4CAF50; background-color: #f5f5f5;");
-    capturedImageLabel->setText("Image capturée");
-    capturedImageLabel->hide();
-    layout->addWidget(capturedImageLabel);
+    // Insérer le nouveau Face ID
+    query.prepare("INSERT INTO \"SYSTEM\".\"FACE_ID\" (\"FACE_HASH\", \"DATE_CREATION\") "
+                  "VALUES (:FACE_HASH, :DATE_CREATION)");
+    query.bindValue(":FACE_HASH", signature);
+    query.bindValue(":DATE_CREATION", QDateTime::currentDateTime());
     
-    // Boutons
-    QPushButton *btnCapture = new QPushButton("📷 Capturer", faceIDDialog);
-    btnCapture->setStyleSheet(
-        "QPushButton { background-color: #2196F3; color: white; padding: 12px 20px; border-radius: 5px; font-size: 14px; font-weight: bold; }"
-        "QPushButton:hover { background-color: #0b7dda; }"
-        "QPushButton:disabled { background-color: #ccc; }"
-    );
+    if (!query.exec()) {
+        QString errorText = query.lastError().text();
+        QString nativeError = query.lastError().nativeErrorCode();
+        
+        qDebug() << "❌ Erreur SQL (saveFaceID):" << errorText;
+        qDebug() << "   Code erreur Oracle:" << nativeError;
+        qDebug() << "   Longueur signature:" << signature.length();
+        
+        // Gérer les différents types d'erreurs
+        QString errorMessage;
+        if (nativeError == "00942" || errorText.contains("table", Qt::CaseInsensitive) || errorText.contains("does not exist", Qt::CaseInsensitive)) {
+            errorMessage = "La table FACE_ID n'existe pas dans la base de données.\n\n"
+                          "Veuillez exécuter le script SQL create_faceid_table.sql pour créer la table.";
+        } else if (nativeError == "04098" || errorText.contains("trigger", Qt::CaseInsensitive) || errorText.contains("invalid", Qt::CaseInsensitive)) {
+            errorMessage = "Le trigger TRG_FACE_ID est invalide.\n\n"
+                          "Veuillez exécuter le script SQL create_faceid_table.sql pour recréer le trigger.\n\n"
+                          "Détails: " + errorText;
+        } else if (nativeError == "01400" || errorText.contains("NOT NULL", Qt::CaseInsensitive)) {
+            errorMessage = "Erreur: une colonne NOT NULL n'a pas de valeur.\n\n"
+                          "Détails: " + errorText;
+        } else if (nativeError == "01438" || nativeError == "12899" || errorText.contains("value larger", Qt::CaseInsensitive) || errorText.contains("too large", Qt::CaseInsensitive)) {
+            // Extraire la longueur maximale depuis le message d'erreur si possible
+            QString maxLength = "64";
+            if (errorText.contains("maximum:")) {
+                int maxPos = errorText.indexOf("maximum:") + 8;
+                int endPos = errorText.indexOf(")", maxPos);
+                if (endPos > maxPos) {
+                    maxLength = errorText.mid(maxPos, endPos - maxPos).trimmed();
+                }
+            }
+            
+            errorMessage = "La signature est trop longue pour la colonne FACE_HASH.\n\n"
+                          "Longueur actuelle: " + QString::number(signature.length()) + " caractères\n"
+                          "Longueur maximale: " + maxLength + " caractères\n\n"
+                          "Veuillez exécuter le script SQL fix_faceid_column_size.sql pour modifier la taille de la colonne.\n\n"
+                          "Détails: " + errorText;
+        } else {
+            errorMessage = "Erreur lors de l'enregistrement dans la base de données.\n\n"
+                          "Code erreur: " + nativeError + "\n"
+                          "Message: " + errorText;
+        }
+        
+        QMessageBox::warning(this, "Erreur d'enregistrement", errorMessage);
+        return false;
+    }
     
-    // Bouton qui change selon le mode (Reconnaître ou Enregistrer)
-    QString btnText = isRecognitionMode ? "✅ Reconnaître" : "💾 Enregistrer Face ID";
-    QPushButton *btnRecognize = new QPushButton(btnText, faceIDDialog);
-    btnRecognize->setStyleSheet(
-        "QPushButton { background-color: #4CAF50; color: white; padding: 12px 20px; border-radius: 5px; font-size: 14px; font-weight: bold; }"
-        "QPushButton:hover { background-color: #45a049; }"
-        "QPushButton:disabled { background-color: #ccc; }"
-    );
-    btnRecognize->setEnabled(false);
+    qDebug() << "✅ Face ID sauvegardé avec succès";
+    return true;
+}
+
+bool AUTHETIFICATION::hasFaceIDRegistered()
+{
+    QSqlQuery query;
+    query.prepare("SELECT COUNT(*) FROM \"SYSTEM\".\"FACE_ID\"");
     
-    QPushButton *btnRetake = new QPushButton("🔄 Reprendre", faceIDDialog);
-    btnRetake->setStyleSheet(
-        "QPushButton { background-color: #FF9800; color: white; padding: 12px 20px; border-radius: 5px; font-size: 14px; }"
-        "QPushButton:hover { background-color: #e68900; }"
-    );
-    btnRetake->hide();
+    if (query.exec() && query.next()) {
+        int count = query.value(0).toInt();
+        qDebug() << "🔍 Face ID enregistré:" << (count > 0 ? "Oui" : "Non");
+        return count > 0;
+    }
     
-    QPushButton *btnCancel = new QPushButton("❌ Annuler", faceIDDialog);
-    btnCancel->setStyleSheet(
-        "QPushButton { background-color: #f44336; color: white; padding: 12px 20px; border-radius: 5px; font-size: 14px; }"
-        "QPushButton:hover { background-color: #da190b; }"
-    );
+    qDebug() << "⚠ Erreur lors de la vérification du Face ID:" << query.lastError().text();
+    return false;
+}
+
+QString AUTHETIFICATION::getSavedFaceHash()
+{
+    QSqlQuery query;
+    query.prepare("SELECT \"FACE_HASH\" FROM \"SYSTEM\".\"FACE_ID\" WHERE ROWNUM = 1 ORDER BY \"DATE_CREATION\" DESC");
     
-    QHBoxLayout *buttonLayout = new QHBoxLayout();
-    buttonLayout->addWidget(btnCapture);
-    buttonLayout->addWidget(btnRecognize);
-    buttonLayout->addWidget(btnRetake);
-    buttonLayout->addWidget(btnCancel);
-    layout->addLayout(buttonLayout);
+    if (query.exec() && query.next()) {
+        QString hash = query.value(0).toString();
+        qDebug() << "✅ Face ID récupéré depuis la base de données";
+        return hash;
+    }
     
-    // Variables pour la caméra et l'image capturée
-    QCamera *camera = nullptr;
-    QImageCapture *imageCapture = nullptr;
-    QMediaCaptureSession *captureSession = nullptr;
-    QImage capturedImage;
-    bool imageCaptured = false;
+    qDebug() << "⚠ Aucun Face ID trouvé dans la base de données";
+    return QString();
+}
+
+bool AUTHETIFICATION::verifyFaceID(const QString &capturedHash)
+{
+    QString savedHash = getSavedFaceHash();
     
-    // Initialiser la caméra
-    const QList<QCameraDevice> cameras = QMediaDevices::videoInputs();
+    if (savedHash.isEmpty()) {
+        qDebug() << "❌ Aucun Face ID sauvegardé pour comparaison";
+        return false;
+    }
+    
+    // Calculer la distance de Hamming entre les deux signatures
+    int distance = hammingDistance(capturedHash, savedHash);
+    
+    // Extraire les parties binaires des signatures
+    QString capturedBinary = capturedHash.contains("_") ? capturedHash.split("_").last() : capturedHash;
+    QString savedBinary = savedHash.contains("_") ? savedHash.split("_").last() : savedHash;
+    
+    int maxLength = qMax(capturedBinary.length(), savedBinary.length());
+    double similarity = maxLength > 0 ? (1.0 - (double)distance / maxLength) * 100.0 : 0.0;
+    
+    qDebug() << "🔍 Comparaison Face ID:";
+    qDebug() << "   Distance de Hamming:" << distance;
+    qDebug() << "   Longueur max:" << maxLength;
+    qDebug() << "   Similarité:" << QString::number(similarity, 'f', 2) << "%";
+    
+    // Seuil de tolérance: 75% de similarité minimum
+    bool match = similarity >= 75.0;
+    
+    if (match) {
+        // Mettre à jour la date de dernière utilisation
+        QSqlQuery updateQuery;
+        updateQuery.prepare("UPDATE \"SYSTEM\".\"FACE_ID\" SET \"DATE_DERNIERE_UTILISATION\" = :DATE WHERE ROWNUM = 1");
+        updateQuery.bindValue(":DATE", QDateTime::currentDateTime());
+        updateQuery.exec();
+    }
+    
+    return match;
+}
+
+int AUTHETIFICATION::hammingDistance(const QString &sig1, const QString &sig2)
+{
+    // Extraire les parties binaires des signatures
+    QString binary1 = sig1.contains("_") ? sig1.split("_").last() : sig1;
+    QString binary2 = sig2.contains("_") ? sig2.split("_").last() : sig2;
+    
+    int distance = 0;
+    int minLength = qMin(binary1.length(), binary2.length());
+    
+    // Compter les différences
+    for (int i = 0; i < minLength; i++) {
+        if (binary1[i] != binary2[i]) {
+            distance++;
+        }
+    }
+    
+    // Ajouter la différence de longueur comme pénalité
+    distance += qAbs(binary1.length() - binary2.length());
+    
+    return distance;
+}
+
+void AUTHETIFICATION::recognizeFaceID()
+{
+    // Vérifier si une caméra est disponible
+    QList<QCameraDevice> cameras = QMediaDevices::videoInputs();
     if (cameras.isEmpty()) {
-        QMessageBox::warning(faceIDDialog, "Erreur", 
-            "Aucune caméra détectée sur cet appareil.\n"
-            "Veuillez connecter une caméra et réessayer.");
-        delete faceIDDialog;
+        QMessageBox::warning(this, "Erreur", "Aucune caméra détectée.\nVeuillez connecter une caméra et réessayer.");
         return;
     }
     
-    // Utiliser la première caméra disponible (généralement la caméra frontale ou principale)
-    camera = new QCamera(cameras.first(), faceIDDialog);
-    imageCapture = new QImageCapture(faceIDDialog);
-    captureSession = new QMediaCaptureSession(faceIDDialog);
+    // Créer un dialogue modal pour la reconnaissance
+    QDialog *recognizeDialog = new QDialog(this);
+    recognizeDialog->setWindowTitle("Reconnaissance Face ID");
+    recognizeDialog->setModal(true);
+    recognizeDialog->resize(640, 480);
+    
+    QVBoxLayout *layout = new QVBoxLayout(recognizeDialog);
+    
+    // Widget vidéo pour afficher le flux de la caméra
+    QVideoWidget *videoWidget = new QVideoWidget(recognizeDialog);
+    layout->addWidget(videoWidget);
+    
+    // Boutons
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    QPushButton *btnRecognize = new QPushButton("Reconnaître", recognizeDialog);
+    QPushButton *btnCancel = new QPushButton("Annuler", recognizeDialog);
+    buttonLayout->addWidget(btnRecognize);
+    buttonLayout->addWidget(btnCancel);
+    layout->addLayout(buttonLayout);
+    
+    // Configurer la caméra
+    QCamera *camera = new QCamera(cameras.first(), recognizeDialog);
+    QImageCapture *imageCapture = new QImageCapture(recognizeDialog);
+    QMediaCaptureSession *captureSession = new QMediaCaptureSession(recognizeDialog);
     
     captureSession->setCamera(camera);
     captureSession->setImageCapture(imageCapture);
-    captureSession->setVideoOutput(viewfinder);
+    captureSession->setVideoOutput(videoWidget);
+    
+    // Variables pour stocker l'image capturée
+    QImage *capturedImagePtr = new QImage();
+    bool *imageCapturedPtr = new bool(false);
+    
+    // Connecter le signal de capture
+    connect(imageCapture, &QImageCapture::imageCaptured, recognizeDialog, [=](int /*id*/, const QImage &img) {
+        *capturedImagePtr = img;
+        *imageCapturedPtr = true;
+        qDebug() << "✅ Image capturée pour reconnaissance, taille:" << img.size();
+    });
+    
+    // Connecter le signal d'erreur
+    connect(imageCapture, &QImageCapture::errorOccurred, recognizeDialog, [=](int /*id*/, QImageCapture::Error /*error*/, const QString &errorString) {
+        qDebug() << "❌ Erreur capture:" << errorString;
+        QMessageBox::warning(recognizeDialog, "Erreur", "Erreur lors de la capture: " + errorString);
+    });
+    
+    // Connecter le bouton de reconnaissance
+    connect(btnRecognize, &QPushButton::clicked, recognizeDialog, [=]() {
+        *imageCapturedPtr = false;
+        int id = imageCapture->capture();
+        if (id == -1) {
+            QMessageBox::warning(recognizeDialog, "Erreur", "Impossible de démarrer la capture.");
+            return;
+        }
+        // Attendre un peu pour que l'image soit capturée
+        QTimer::singleShot(1000, recognizeDialog, [=]() {
+            if (*imageCapturedPtr && !capturedImagePtr->isNull()) {
+                recognizeDialog->accept();
+            } else {
+                QMessageBox::warning(recognizeDialog, "Erreur", "Échec de la capture. Veuillez réessayer.");
+            }
+        });
+    });
+    
+    // Connecter le bouton d'annulation
+    connect(btnCancel, &QPushButton::clicked, recognizeDialog, &QDialog::reject);
     
     // Démarrer la caméra
     camera->start();
     
-    // Connecter le bouton de capture
-    connect(btnCapture, &QPushButton::clicked, [&]() {
-        if (camera && camera->isActive() && imageCapture) {
-            imageCapture->capture();
-        }
-    });
+    // Attendre la fermeture du dialogue
+    int result = recognizeDialog->exec();
     
-    // Gérer l'image capturée (Qt 6 API)
-    connect(imageCapture, &QImageCapture::imageCaptured, [&](int id, const QImage &image) {
-        Q_UNUSED(id);
-        capturedImage = image;
-        imageCaptured = true;
+    if (result == QDialog::Accepted && *imageCapturedPtr && !capturedImagePtr->isNull()) {
+        // Normaliser l'image
+        QImage normalized = normalizeFaceImage(*capturedImagePtr);
         
-        // Afficher l'image capturée
-        QPixmap pixmap = QPixmap::fromImage(image);
-        capturedImageLabel->setPixmap(pixmap.scaled(640, 480, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        // Générer la signature
+        QString signature = generateFaceSignature(normalized);
         
-        // Cacher le viewfinder et afficher l'image capturée
-        viewfinder->hide();
-        capturedImageLabel->show();
-        
-        // Activer le bouton de reconnaissance/enregistrement
-        btnRecognize->setEnabled(true);
-        btnCapture->setEnabled(false);
-        btnRetake->show();
-        
-        QString nextInstruction = isRecognitionMode 
-            ? "Image capturée ! Cliquez sur 'Reconnaître' pour continuer."
-            : "Image capturée ! Cliquez sur 'Enregistrer Face ID' pour sauvegarder.";
-        instructionLabel->setText(nextInstruction);
-    });
-    
-    // Gérer les erreurs de capture (Qt 6 API)
-    connect(imageCapture, &QImageCapture::errorOccurred, [&](int id, QImageCapture::Error error, const QString &errorString) {
-        Q_UNUSED(id);
-        Q_UNUSED(error);
-        QMessageBox::warning(faceIDDialog, "Erreur de capture", 
-            QString("Erreur lors de la capture: %1").arg(errorString));
-    });
-    
-    // Connecter le bouton de reconnaissance/enregistrement
-    connect(btnRecognize, &QPushButton::clicked, [&, faceIDDialog, isRecognitionMode]() {
-        if (!imageCaptured || capturedImage.isNull()) {
-            QMessageBox::warning(faceIDDialog, "Erreur", "Aucune image capturée.");
-            return;
-        }
-        
-        // Générer le hash de l'image faciale
-        QString faceHash = generateFaceHash(capturedImage);
-        
-        if (isRecognitionMode) {
-            // MODE RECONNAISSANCE : Vérifier si le Face ID correspond
-            if (verifyFaceID(faceHash)) {
-                // Reconnaissance réussie
-                QMessageBox::information(faceIDDialog, "Reconnaissance Faciale", 
-                    "✅ Reconnaissance faciale réussie !\n\n"
-                    "Votre visage a été reconnu avec succès.\n"
-                    "Vous allez être connecté...");
-                
-                // Arrêter la caméra
-                if (camera) {
-                    camera->stop();
-                }
-                
-                // Fermer les dialogues et accepter l'authentification
-                faceIDDialog->accept();
-                this->accept();
-            } else {
-                // Reconnaissance échouée
-                QMessageBox::critical(faceIDDialog, "Erreur de Reconnaissance", 
-                    "❌ Reconnaissance faciale échouée !\n\n"
-                    "Le visage capturé ne correspond pas au Face ID enregistré.\n"
-                    "Veuillez réessayer ou utiliser l'authentification par identifiant/mot de passe.");
-                
-                // Réinitialiser pour permettre une nouvelle tentative
-                imageCaptured = false;
-                capturedImage = QImage();
-                btnRecognize->setEnabled(false);
-                btnCapture->setEnabled(true);
-                btnRetake->show();
-                capturedImageLabel->hide();
-                viewfinder->show();
-                instructionLabel->setText("Positionnez votre visage devant la caméra pour la reconnaissance");
-                
-                // Redémarrer la caméra
-                if (camera && !camera->isActive()) {
-                    camera->start();
-                }
-            }
+        // Vérifier avec le Face ID sauvegardé
+        if (verifyFaceID(signature)) {
+            QMessageBox::information(this, "Succès", "Face ID reconnu avec succès !\nConnexion en cours...");
+            // Accepter l'authentification
+            accept();
         } else {
-            // MODE ENREGISTREMENT : Sauvegarder le nouveau Face ID
-            if (saveFaceID(faceHash)) {
-                QMessageBox::information(faceIDDialog, "Face ID Enregistré", 
-                    "✅ Face ID enregistré avec succès !\n\n"
-                    "Votre visage a été sauvegardé.\n"
-                    "Vous pouvez maintenant utiliser Face ID pour vous connecter.");
-                
-                // Arrêter la caméra
-                if (camera) {
-                    camera->stop();
-                }
-                
-                // Fermer les dialogues et accepter l'authentification
-                faceIDDialog->accept();
-                this->accept();
-            } else {
-                // Vérifier si c'est un problème de table
-                QString errorDetails;
-                if (!tableFaceIDExists()) {
-                    errorDetails = "La table FACE_ID n'existe pas dans la base de données.\n\n"
-                                  "Veuillez exécuter le script SQL suivant dans votre base de données Oracle :\n"
-                                  "create_faceid_table.sql\n\n"
-                                  "Ce script crée la table nécessaire pour stocker les Face ID.";
-                } else {
-                    QSqlQuery testQuery;
-                    testQuery.prepare("SELECT 1 FROM \"SYSTEM\".\"FACE_ID\"");
-                    if (!testQuery.exec()) {
-                        QSqlError error = testQuery.lastError();
-                        errorDetails = QString("Erreur de base de données :\n%1\n\nCode : %2")
-                                      .arg(error.text())
-                                      .arg(error.nativeErrorCode());
-                    } else {
-                        errorDetails = "Erreur lors de l'enregistrement du Face ID.\n"
-                                      "Veuillez vérifier votre connexion à la base de données.";
-                    }
-                }
-                
-                QMessageBox::critical(faceIDDialog, "Erreur d'enregistrement", 
-                    QString("❌ Erreur lors de l'enregistrement du Face ID.\n\n%1").arg(errorDetails));
-            }
+            QMessageBox::warning(this, "Échec", 
+                                "Face ID non reconnu.\n\n"
+                                "Veuillez réessayer ou utiliser la connexion normale.");
         }
-    });
+    }
     
-    // Connecter le bouton de reprise
-    connect(btnRetake, &QPushButton::clicked, [&, isRecognitionMode]() {
-        imageCaptured = false;
-        capturedImage = QImage();
-        btnRecognize->setEnabled(false);
-        btnCapture->setEnabled(true);
-        btnRetake->hide();
-        capturedImageLabel->hide();
-        viewfinder->show();
-        QString resetInstruction = isRecognitionMode 
-            ? "Positionnez votre visage devant la caméra pour la reconnaissance"
-            : "Enregistrez votre Face ID\nPositionnez votre visage devant la caméra";
-        instructionLabel->setText(resetInstruction);
-        
-        // Redémarrer la caméra si nécessaire
-        if (camera && !camera->isActive()) {
-            camera->start();
-        }
-    });
-    
-    // Connecter le bouton d'annulation
-    connect(btnCancel, &QPushButton::clicked, [&, faceIDDialog]() {
-        if (camera) {
-            camera->stop();
-        }
-        faceIDDialog->reject();
-    });
-    
-    // Nettoyer lors de la fermeture
-    connect(faceIDDialog, &QDialog::finished, [&]() {
-        if (camera) {
-            camera->stop();
-        }
-    });
-    
-    // Afficher le dialogue
-    faceIDDialog->exec();
-    delete faceIDDialog;
+    // Nettoyer
+    camera->stop();
+    delete capturedImagePtr;
+    delete imageCapturedPtr;
+    delete recognizeDialog;
 }
+

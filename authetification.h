@@ -2,6 +2,7 @@
 #define AUTHETIFICATION_H
 
 #include <QDialog>
+#include <QImage>
 #include "InputController.h"
 
 QT_BEGIN_NAMESPACE
@@ -28,14 +29,16 @@ private:
     void afficherErreur(const QString &champ, const QString &message);
     void effacerErreur(const QString &champ);
     
-    // Méthodes pour la gestion Face ID
-    bool hasFaceIDRegistered();
-    bool saveFaceID(const QString &faceHash);
-    bool verifyFaceID(const QString &faceHash);
-    QString generateFaceHash(const QImage &image);
+    // Méthodes Face ID
     QImage normalizeFaceImage(const QImage &image);
-    bool tableFaceIDExists();
-    int hammingDistance(const QString &hash1, const QString &hash2);
+    QString generateFaceSignature(const QImage &image);
+    bool saveFaceID(const QString &signature);
+    bool hasFaceIDRegistered();
+    QString getSavedFaceHash();
+    bool verifyFaceID(const QString &capturedHash);
+    void recognizeFaceID();
+    void startFaceIDRegistration();
+    int hammingDistance(const QString &sig1, const QString &sig2);
 };
 
 #endif // AUTHETIFICATION_H
