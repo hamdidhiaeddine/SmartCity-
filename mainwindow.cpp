@@ -37,12 +37,22 @@
 #include "InputController.h"
 #include "maison.h"
 #include "resident.h"
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    connect(ui->tribox, &QComboBox::currentTextChanged,
+            this, &MainWindow::onTriBoxChanged);
+    networkManager = new QNetworkAccessManager(this);
     this->resize(1920, 1080);
     this->move(0, 0);
 
@@ -67,12 +77,14 @@ MainWindow::MainWindow(QWidget *parent)
         ui->immatline_2->setText(ui->tableau_3->item(row, 1)->text());
         ui->marqueline_2->setText(ui->tableau_3->item(row, 2)->text());
         ui->modeleline_2->setText(ui->tableau_3->item(row, 3)->text());
-        ui->Typeline_2->setText(ui->tableau_3->item(row, 4)->text());
-        ui->Etatline_2->setText(ui->tableau_3->item(row, 5)->text());
+        ui->triemail_2->setCurrentText(ui->tableau_3->item(row, 4)->text());
+        ui->Etatline_2->setCurrentText(ui->tableau_3->item(row, 5)->text());
         ui->serviceline_2->setText(ui->tableau_3->item(row, 6)->text());
         QString dateStr = ui->tableau_3->item(row, 7)->text();  // get date from table
         QDate date = QDate::fromString(dateStr, "dd/MM/yyyy");  // convert to QDate
-        ui->datemaintline_2->setText(date.toString("dd/MM/yyyy"));
+        ui->datemaintline_2->setDate(date);
+        ui->datemaintline_2->setDisplayFormat("dd/MM/yyyy");
+
 
         selectedImmat = ui->tableau_3->item(row, 1)->text();
         qDebug() << "✅ [DEBUG] selectedImmat set to:" << selectedImmat;
@@ -106,10 +118,7 @@ void MainWindow::connectButtons()
     }
 
     // CRUD Véhicules (connexion manuelle uniquement, pas de connexion automatique)
-    connect(ui->ajouter_3, &QPushButton::clicked, this, &MainWindow::onAjouterVehicule);
-    connect(ui->modifier_3, &QPushButton::clicked, this, &MainWindow::onModifierVehicule);
-    connect(ui->supprimer_3, &QPushButton::clicked, this, &MainWindow::onSupprimerVehicule);
-    connect(ui->exporter_3, &QPushButton::clicked, this, &MainWindow::onExporterVehicule);
+
 
     // CRUD Maisons (connexion manuelle uniquement, pas de connexion automatique)
     connect(ui->ajouter_7, &QPushButton::clicked, this, &MainWindow::onAjouterMaison);
@@ -169,38 +178,6 @@ void MainWindow::connectButtons()
         ui->situationline_2->setText(ui->tableau_5->item(row, 7)->text());
     });
 
-    // Initialize Type LineEdit for vehicles
-    ui->Typeline_2->clear(); // Clear any previous text
-
-    // Initialize État LineEdit for vehicles
-    ui->Etatline_2->clear(); // Clear any previous text
-
-    // Setup recherche and tri for Véhicules
-    // Hide the recherche QLabel and replace it with QLineEdit for vehicles
-    if (ui->recherche_2) {
-        ui->recherche_2->hide();
-    }
-    
-    // Find or create recherche line edit widget for vehicles
-    QList<QLineEdit*> vehiculeLineEdits = ui->trirecherche_2->findChildren<QLineEdit*>();
-    if (!vehiculeLineEdits.isEmpty()) {
-        m_rechercheVehiculeLineEdit = vehiculeLineEdits.first();
-        m_rechercheVehiculeLineEdit->setPlaceholderText(tr("Rechercher par immatriculation"));
-        m_rechercheVehiculeLineEdit->setGeometry(10, 10, 301, 25);
-        m_rechercheVehiculeLineEdit->setStyleSheet("background-color: white; color: black; font: 10pt \"Arial\";");
-        connect(m_rechercheVehiculeLineEdit, &QLineEdit::textChanged, this, &MainWindow::onRechercheVehiculeChanged);
-    } else {
-        // Create a QLineEdit at the same position as the label
-        m_rechercheVehiculeLineEdit = new QLineEdit(ui->trirecherche_2);
-        m_rechercheVehiculeLineEdit->setPlaceholderText(tr("Rechercher par immatriculation"));
-        m_rechercheVehiculeLineEdit->setGeometry(10, 10, 301, 25);
-        m_rechercheVehiculeLineEdit->setStyleSheet("background-color: white; color: black; font: 10pt \"Arial\";");
-        connect(m_rechercheVehiculeLineEdit, &QLineEdit::textChanged, this, &MainWindow::onRechercheVehiculeChanged);
-    }
-    
-    // Connect tri combo boxes for vehicles
-    connect(ui->triemail_2, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onTriTypeChanged);
-    connect(ui->trisalaire_2, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onTriEtatChanged);
 
     // Table selection -> fill ID for delete/edit
     ui->tableau->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -211,6 +188,8 @@ void MainWindow::connectButtons()
     if (ui->recherche) {
         ui->recherche->hide();
     }
+
+
     
     // Setup recherche and tri combo boxes for Employés
     ui->triemail->clear();
@@ -275,6 +254,20 @@ void MainWindow::onGestionCabinets()
 void MainWindow::onDeconnexion()
 {
     close();
+}
+void MainWindow::on_btnChatbot_clicked()
+{
+    ui->stackedWidget_3->setCurrentWidget(ui->pageChatbot);
+}
+
+void MainWindow::on_btnBackFromChat_clicked()
+{
+    ui->stackedWidget_3->setCurrentWidget(ui->page_9);
+}
+
+void MainWindow::on_btnBackFromRecom_clicked()
+{
+    ui->stackedWidget_3->setCurrentWidget(ui->page_9);
 }
 
 // === Employés CRUD ===
@@ -840,112 +833,115 @@ void MainWindow::onStatistiqueEmploye()
 }
 
 // === Véhicules CRUD ===
-void MainWindow::onAjouterVehicule()
+void MainWindow::on_ajouter_3_clicked()
 {
     QString immat = ui->immatline_2->text().trimmed();
     QString marque = ui->marqueline_2->text().trimmed();
     QString modele = ui->modeleline_2->text().trimmed();
-    // Get text from LineEdit (simple text input)
-    QString type = ui->Typeline_2->text().trimmed();
-    QString etat = ui->Etatline_2->text().trimmed(); // QLineEdit
+    QString type = ui->triemail_2->currentText().trimmed();
+    QString etatOriginal = ui->Etatline_2->currentText();   // valeur brute
+    QString etat = etatOriginal.trimmed();                  // nettoyée
     QString service = ui->serviceline_2->text().trimmed();
-    QDate date_maint = QDate::fromString(ui->datemaintline_2->text(), "dd/MM/yyyy");
+    QDate date_maint = ui->datemaintline_2->date();
+
+    // ==========================================================
+    // 🔍 DEBUG : Pour afficher exactement ce que contient "etat"
+    // ==========================================================
+    qDebug() << "===== DEBUG ETAT =====";
+    qDebug() << "ETAT (brut) =" << etatOriginal;
+    qDebug() << "ETAT (trimmed) =" << etat;
+    qDebug() << "Longueur (brut) =" << etatOriginal.size();
+    qDebug() << "Longueur (trimmed) =" << etat.size();
+
+    for (int i = 0; i < etatOriginal.size(); ++i) {
+        qDebug() << "brut[" << i << "] =" << etatOriginal.at(i);
+    }
+    for (int i = 0; i < etat.size(); ++i) {
+        qDebug() << "trim[" << i << "] =" << etat.at(i);
+    }
+    qDebug() << "========================";
+    // FIN DEBUG
+    // ==========================================================
 
 
     // === CONTRÔLES DE SAISIE ===
     if (immat.isEmpty() || marque.isEmpty() || modele.isEmpty() || service.isEmpty()) {
-        QMessageBox::warning(this, tr("Erreur"), tr("Tous les champs doivent être remplis."));
+        QMessageBox::warning(this, "Erreur", "Tous les champs doivent être remplis.");
         return;
     }
 
     // Vérif immatriculation
-    QRegularExpression immatRegex("^[A-Za-z0-9\\-]{4,15}$");
+    QRegularExpression immatRegex("^\\d{3}-TN-\\d{1,4}$");
     if (!immatRegex.match(immat).hasMatch()) {
-        QMessageBox::warning(this, tr("Erreur"), tr("Format d'immatriculation invalide (ex : 123-TN-456)."));
+        QMessageBox::warning(this, "Erreur", "Format d'immatriculation invalide (ex : 123-TN-4567).");
         return;
     }
 
-    // Vérif Type - Allow any non-empty value (ComboBox is editable)
-    if (type.isEmpty() || type.toLower() == "type" || type.toLower() == "type de véhicule") {
-        QMessageBox::warning(this, tr("Erreur"), tr("Veuillez choisir un type de véhicule."));
+    // Vérif Type
+    if (type.isEmpty() || type == "Type") {
+        QMessageBox::warning(this, "Erreur", "Veuillez choisir un type de véhicule.");
         return;
     }
 
-    // Vérif État (ComboBox)
-    if (etat.isEmpty() || (etat != "Neuf" && etat != "Usé" && etat != "En panne")) {
-        QMessageBox::warning(this, tr("Erreur"), tr("Veuillez sélectionner un état valide (Neuf, Usé, En panne)."));
+    // Vérif État (ComboBox) — version CORRIGÉE
+    QString etatNorm = etat.toLower();  // normalisation
+
+    if (etatNorm != "neuf" && etatNorm != "usé" && etatNorm != "en panne") {
+        QMessageBox::warning(this, "Erreur",
+                             "Veuillez sélectionner un état valide (Neuf, Usé, En panne).");
         return;
     }
+
 
     // Vérif date
     if (!date_maint.isValid()) {
-        QMessageBox::warning(this, tr("Erreur"), tr("Date de maintenance invalide. Format attendu : jj/MM/aaaa"));
+        QMessageBox::warning(this, "Erreur", "Date de maintenance invalide. Format attendu : jj/MM/aaaa");
         return;
     }
     if (date_maint > QDate::currentDate()) {
-        QMessageBox::warning(this, tr("Erreur"), tr("La date de maintenance ne peut pas être dans le futur."));
+        QMessageBox::warning(this, "Erreur", "La date de maintenance ne peut pas être dans le futur.");
         return;
     }
 
     // Vérif doublon immat
     QSqlQuery checkQuery;
-    checkQuery.prepare("SELECT COUNT(*) FROM \"SYSTEM\".\"VEHICULES\" WHERE \"IMMATT\" = :IMMAT");
+    checkQuery.prepare("SELECT COUNT(*) FROM SYSTEM.VEHICULE WHERE IMMAT = :IMMAT");
     checkQuery.bindValue(":IMMAT", immat);
     if (checkQuery.exec() && checkQuery.next() && checkQuery.value(0).toInt() > 0) {
-        QMessageBox::warning(this, tr("Erreur"), tr("Un véhicule avec cette immatriculation existe déjà !"));
+        QMessageBox::warning(this, "Erreur", "Un véhicule avec cette immatriculation existe déjà !");
         return;
     }
 
-    // === AJOUT APRÈS VALIDATION ===
+    // === AJOUT FINAL ===
     Vehicule v(immat, marque, modele, type, etat, service, date_maint);
 
     if (v.ajouter()) {
-        QMessageBox::information(this, tr("Succès"), tr("Véhicule ajouté avec succès."));
-        // Clear input fields after successful insert
-        ui->immatline_2->clear();
-        ui->marqueline_2->clear();
-        ui->modeleline_2->clear();
-        ui->Typeline_2->clear();
-        ui->Etatline_2->clear();
-        ui->serviceline_2->clear();
-        ui->datemaintline_2->clear();
-        selectedImmat.clear();
+        QMessageBox::information(this, "Succès", "Véhicule ajouté avec succès !");
         loadVehicules();
         qDebug() << "✅ Véhicule ajouté :" << immat << marque << modele << etat;
     } else {
-        QMessageBox::warning(this, tr("Erreur"), tr("Échec de l'ajout du véhicule."));
+        QMessageBox::critical(this, "Erreur SQL", "Échec de l'ajout du véhicule !");
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-void MainWindow::onModifierVehicule()
+void MainWindow::on_modifier_3_clicked()
 {
-    qDebug() << "🔎 [DEBUG] onModifierVehicule() triggered";
+    qDebug() << "🔎 [DEBUG] on_modifier_3_clicked() triggered";
     qDebug() << "🔎 [DEBUG] selectedImmat current value:" << selectedImmat;
 
     if (selectedImmat.isEmpty()) {
         qDebug() << "⚠️ [DEBUG] No vehicle selected before modifying!";
-        QMessageBox::warning(this, tr("Erreur"), tr("Veuillez d'abord sélectionner un véhicule à modifier."));
+        QMessageBox::warning(this, "Erreur", "Veuillez d'abord sélectionner un véhicule à modifier.");
         return;
     }
 
     // Read current form values
-    QString immat   = ui->immatline_2->text().trimmed();
-    QString marque  = ui->marqueline_2->text().trimmed();
-    QString modele  = ui->modeleline_2->text().trimmed();
-    // Get text from editable ComboBox
-    QString type    = ui->Typeline_2->text().trimmed();
-    QString etat    = ui->Etatline_2->text().trimmed();
-    QString service = ui->serviceline_2->text().trimmed();
+    QString immat   = ui->immatline_2->text();
+    QString marque  = ui->marqueline_2->text();
+    QString modele  = ui->modeleline_2->text();
+    QString type    = ui->triemail_2->currentText();
+    QString etat    = ui->Etatline_2->currentText();
+    QString service = ui->serviceline_2->text();
     QDate   date_maint = QDate::fromString(ui->datemaintline_2->text(), "dd/MM/yyyy");
 
     qDebug() << "✅ [DEBUG] Form values:"
@@ -987,62 +983,37 @@ void MainWindow::onModifierVehicule()
         // And also refresh from DB to stay 100% in sync (optional but safe)
         loadVehicules();
 
-        QMessageBox::information(this, tr("Succès"), tr("Véhicule modifié avec succès."));
-        // Clear input fields after successful update
-        ui->immatline_2->clear();
-        ui->marqueline_2->clear();
-        ui->modeleline_2->clear();
-        ui->Typeline_2->clear();
-        ui->Etatline_2->clear();
-        ui->serviceline_2->clear();
-        ui->datemaintline_2->clear();
+        QMessageBox::information(this, "Succès", "Véhicule modifié avec succès !");
         selectedImmat.clear();  // reset after update
     } else {
-        QMessageBox::warning(this, tr("Erreur"), tr("Échec de la modification du véhicule."));
+        QMessageBox::warning(this, "Erreur", "Échec de la modification du véhicule !");
     }
 }
 
-void MainWindow::onSupprimerVehicule()
+void MainWindow::on_supprimer_3_clicked()
 {
+    // Example: delete selected row from database and refresh table
     int row = ui->tableau_3->currentRow();
     if (row < 0) {
-        QMessageBox::warning(this, tr("Erreur"), tr("Veuillez sélectionner un véhicule à supprimer."));
+        QMessageBox::warning(this, "Suppression", "Veuillez sélectionner un véhicule à supprimer.");
         return;
     }
 
-    QString immat = ui->tableau_3->item(row, 1)->text();
-    
-    if (QMessageBox::question(this, tr("Confirmer"), tr("Supprimer le véhicule %1?").arg(immat)) != QMessageBox::Yes) {
-        return;
-    }
-
+    QString immat = ui->tableau_3->item(row, 1)->text(); // Assuming first column is immat
     Vehicule v;
-    bool success = v.supprimer(immat);
+    bool success = v.supprimer(immat); // Use your Vehicule::supprimer(QString) function
 
     if (success) {
-        loadVehicules(); // Refresh table from database
-        QMessageBox::information(this, tr("Succès"), tr("Véhicule supprimé."));
-        // Clear input fields
-        ui->immatline_2->clear();
-        ui->marqueline_2->clear();
-        ui->modeleline_2->clear();
-        ui->Typeline_2->clear();
-        ui->Etatline_2->clear();
-        ui->serviceline_2->clear();
-        ui->datemaintline_2->clear();
-        selectedImmat.clear();
+        ui->tableau_3->removeRow(row);
+        QMessageBox::information(this, "Suppression", "Véhicule supprimé avec succès !");
     } else {
-        QMessageBox::warning(this, tr("Erreur"), tr("La suppression a échoué."));
+        QMessageBox::critical(this, "Erreur", "La suppression a échoué !");
     }
 }
 
-void MainWindow::onExporterVehicule()
-{
-    if (ui->tableau_3->rowCount() == 0) {
-        QMessageBox::warning(this, tr("Avertissement"), tr("Aucune donnée à exporter."));
-        return;
-    }
 
+void MainWindow::on_exporter_3_clicked()
+{
     QString fileName = QFileDialog::getSaveFileName(this, "Exporter en PDF", "", "*.pdf");
     if (fileName.isEmpty())
         return;
@@ -1065,14 +1036,14 @@ void MainWindow::onExporterVehicule()
     int leftMargin = 80;
     int rightMargin = 80;
     int topMargin = 260;
-    int headerHeight = 100;
-    int rowHeight = 100;
+    int headerHeight = 100;   // plus haut qu’avant
+    int rowHeight = 100;      // lignes plus grandes
     int colCount = ui->tableau_3->columnCount();
     int rowCount = ui->tableau_3->rowCount();
     int tableWidth = pdf.width() - (leftMargin + rightMargin);
 
     // --- LARGEUR DES COLONNES (proportionnelle) ---
-    QVector<int> colWeights = {8, 18, 15, 15, 10, 10, 12, 20};
+    QVector<int> colWeights = {8, 18, 15, 15, 10, 10, 12, 20}; // dernière colonne plus large
     int totalWeight = 0;
     for (int w : colWeights) totalWeight += w;
 
@@ -1084,10 +1055,14 @@ void MainWindow::onExporterVehicule()
     painter.setFont(QFont("Arial", 12, QFont::Bold));
     painter.setBrush(QColor(210, 210, 210));
     painter.setPen(Qt::black);
+
     int x = leftMargin;
+    painter.drawRect(leftMargin, topMargin, tableWidth, headerHeight);
 
     for (int col = 0; col < colCount; ++col) {
         QString headerText = ui->tableau_3->horizontalHeaderItem(col)->text();
+
+        // Forcer une ligne multiple si nécessaire
         if (headerText.contains("Date de maintenance", Qt::CaseInsensitive))
             headerText = "Date de\nmaintenance";
 
@@ -1109,8 +1084,11 @@ void MainWindow::onExporterVehicule()
         for (int col = 0; col < colCount; ++col) {
             QRect cellRect(x, y, colWidths[col], rowHeight);
             painter.drawRect(cellRect);
+
             QTableWidgetItem *item = ui->tableau_3->item(row, col);
             QString text = item ? item->text() : "";
+
+            // Alignement centré verticalement avec un léger padding horizontal
             painter.drawText(cellRect.adjusted(10, 0, -10, 0),
                              Qt::AlignVCenter | Qt::AlignLeft,
                              text);
@@ -1120,148 +1098,71 @@ void MainWindow::onExporterVehicule()
     }
 
     painter.end();
-    QMessageBox::information(this, tr("Succès"), tr("Le tableau a été exporté avec succès."));
+    QMessageBox::information(this, "Export PDF", "Le tableau a été exporté avec succès !");
 }
 
 void MainWindow::loadVehicules()
 {
-    // Load all vehicles from database and store in cache
+    ui->tableau_3->clear();
+    ui->tableau_3->setRowCount(0);
+    ui->tableau_3->setColumnCount(9); // +1 colonne cachée
+
+    QStringList headers;
+    headers << "ID" << "Immatriculation" << "Marque" << "Modèle"
+            << "Type" << "État" << "Service" << "Date de maintenance" << "ORDER_DATE";
+
+    ui->tableau_3->setHorizontalHeaderLabels(headers);
+
     QSqlQuery q;
-    if (!q.exec("SELECT \"IMMATT\", \"MARQUE\", \"MODELE\", \"TYPE\", \"ETAT\", \"SRV\", "
-                "TO_CHAR(\"DATE_DE_MAIN\", 'DD/MM/YYYY') AS DATE_MAINT "
-                "FROM \"SYSTEM\".\"VEHICULES\" ORDER BY \"IMMATT\" DESC"))
+    if (!q.exec("SELECT ID_VEHI, IMMAT, MARQUE, MODELE, TYPE, ETAT, SERVICE, "
+                "TO_CHAR(DATE_MAINT, 'DD/MM/YYYY') AS DATE_FR, "
+                "TO_CHAR(DATE_MAINT, 'YYYY-MM-DD') AS DATE_ORDER "
+                "FROM SYSTEM.VEHICULE"))
     {
         QMessageBox::critical(this, "Erreur SQL", q.lastError().text());
         return;
     }
 
-    // Store all vehicles in cache for filtering
-    m_allVehicules.clear();
+    int row = 0;
     while (q.next()) {
-        VehiculeData v;
-        v.immat = q.value(0).toString();
-        v.marque = q.value(1).toString();
-        v.modele = q.value(2).toString();
-        v.type = q.value(3).toString();
-        v.etat = q.value(4).toString();
-        v.service = q.value(5).toString();
-        v.date_maint = q.value(6).toString();
-        m_allVehicules.append(v);
+        ui->tableau_3->insertRow(row);
+
+        // remplit les colonnes visibles
+        for (int col = 0; col < 8; ++col)
+            ui->tableau_3->setItem(row, col, new QTableWidgetItem(q.value(col).toString()));
+
+        // colonne cachée ORDER_DATE
+        ui->tableau_3->setItem(row, 8, new QTableWidgetItem(q.value(8).toString()));
+
+        row++;
     }
 
-    // Apply search and filters
-    appliquerRechercheEtTriVehicules();
-}
-
-void MainWindow::appliquerRechercheEtTriVehicules()
-{
-    if (m_allVehicules.isEmpty()) {
-        ui->tableau_3->setRowCount(0);
-        return;
-    }
-
-    QVector<VehiculeData> filtered = m_allVehicules;
-
-    // Apply recherche by immatriculation
-    if (m_rechercheVehiculeLineEdit && !m_rechercheVehiculeLineEdit->text().isEmpty()) {
-        QString searchText = m_rechercheVehiculeLineEdit->text().trimmed().toUpper();
-        QVector<VehiculeData> temp;
-        for (const VehiculeData &v : filtered) {
-            if (v.immat.toUpper().contains(searchText)) {
-                temp.append(v);
-            }
-        }
-        filtered = temp;
-    }
-
-    // Apply filter by Type
-    int typeIndex = ui->triemail_2->currentIndex();
-    if (typeIndex > 0) { // 0 is "Type" placeholder
-        QString selectedType = ui->triemail_2->currentText();
-        QVector<VehiculeData> temp;
-        for (const VehiculeData &v : filtered) {
-            if (v.type == selectedType) {
-                temp.append(v);
-            }
-        }
-        filtered = temp;
-    }
-
-    // Apply filter by État
-    int etatIndex = ui->trisalaire_2->currentIndex();
-    if (etatIndex > 0) { // 0 is "État" placeholder
-        QString selectedEtat = ui->trisalaire_2->currentText();
-        QVector<VehiculeData> temp;
-        for (const VehiculeData &v : filtered) {
-            if (v.etat == selectedEtat) {
-                temp.append(v);
-            }
-        }
-        filtered = temp;
-    }
-
-    // Display results in table
-    ui->tableau_3->clear();
-    ui->tableau_3->setColumnCount(8);
-    ui->tableau_3->setRowCount(filtered.size());
-    QStringList headers;
-    headers << "ID" << "Immatriculation" << "Marque" << "Modèle"
-            << "Type" << "État" << "Service" << "Date de maintenance";
-    ui->tableau_3->setHorizontalHeaderLabels(headers);
-
-    for (int i = 0; i < filtered.size(); ++i) {
-        const VehiculeData &v = filtered[i];
-        ui->tableau_3->setItem(i, 0, new QTableWidgetItem(QString::number(i + 1))); // ID
-        ui->tableau_3->setItem(i, 1, new QTableWidgetItem(v.immat));
-        ui->tableau_3->setItem(i, 2, new QTableWidgetItem(v.marque));
-        ui->tableau_3->setItem(i, 3, new QTableWidgetItem(v.modele));
-        ui->tableau_3->setItem(i, 4, new QTableWidgetItem(v.type));
-        ui->tableau_3->setItem(i, 5, new QTableWidgetItem(v.etat));
-        ui->tableau_3->setItem(i, 6, new QTableWidgetItem(v.service));
-        ui->tableau_3->setItem(i, 7, new QTableWidgetItem(v.date_maint));
-    }
-
-    ui->tableau_3->setColumnHidden(0, true); // Hide ID column
+    ui->tableau_3->setColumnHidden(0, true);  // cacher ID
+    ui->tableau_3->setColumnHidden(8, true);  // cacher ORDER_DATE
     ui->tableau_3->resizeColumnsToContents();
 }
-
-void MainWindow::onRechercheVehiculeChanged()
-{
-    appliquerRechercheEtTriVehicules();
-}
-
-void MainWindow::onTriTypeChanged()
-{
-    appliquerRechercheEtTriVehicules();
-}
-
-void MainWindow::onTriEtatChanged()
-{
-    appliquerRechercheEtTriVehicules();
-}
-
 QChartView* MainWindow::createVehiculePieChart()
 {
-    // Create the data series
+    // 🔹 Create the data series
     QPieSeries* series = new QPieSeries();
 
-    // Fetch data from the database
+    // 🔹 Fetch data from the database (STAT PAR ÉTAT)
     QSqlQuery query;
-    if (!query.exec("SELECT \"TYPE\", COUNT(*) FROM \"SYSTEM\".\"VEHICULES\" GROUP BY \"TYPE\"")) {
-        qDebug() << "❌ SQL Error (stats TYPE):" << query.lastError().text();
+    if (!query.exec("SELECT ETAT, COUNT(*) FROM SYSTEM.VEHICULE GROUP BY ETAT")) {
+        qDebug() << "❌ SQL Error (stats ETAT):" << query.lastError().text();
         return nullptr;
     }
 
     int total = 0;
     QMap<QString, int> data;
     while (query.next()) {
-        QString type = query.value(0).toString();
+        QString etat = query.value(0).toString();
         int count = query.value(1).toInt();
-        data[type] = count;
+        data[etat] = count;
         total += count;
     }
 
-    // Create slices dynamically
+    // 🔹 Create slices dynamically
     for (auto it = data.begin(); it != data.end(); ++it) {
         double perc = (total > 0) ? (double(it.value()) / total) * 100.0 : 0.0;
         QString label = QString("%1 - %2 véhicules (%3%)")
@@ -1274,10 +1175,13 @@ QChartView* MainWindow::createVehiculePieChart()
         slice->setLabelPosition(QPieSlice::LabelOutside);
         slice->setLabelFont(QFont("Arial", 10, QFont::Bold));
 
-        QColor color = QColor::fromHsv(QRandomGenerator::global()->bounded(360), 200, 250);
+        QColor color = QColor::fromHsv(
+            QRandomGenerator::global()->bounded(360),
+            200,
+            250
+            );
         slice->setBrush(color);
 
-        // Hover animation effect
         QObject::connect(slice, &QPieSlice::hovered, [slice](bool hovered) {
             if (hovered) {
                 slice->setExploded(true);
@@ -1290,59 +1194,414 @@ QChartView* MainWindow::createVehiculePieChart()
         });
     }
 
-    // Create chart
+    // 🔹 Create chart
     QChart* chart = new QChart();
     chart->addSeries(series);
-    chart->setTitle("Répartition des véhicules par type (%)");
+    chart->setTitle("Répartition des véhicules par état (%)");
     chart->setTitleFont(QFont("Arial", 14, QFont::Bold));
     chart->legend()->setAlignment(Qt::AlignBottom);
     chart->legend()->setFont(QFont("Arial", 9));
     chart->setAnimationOptions(QChart::AllAnimations);
     chart->setTheme(QChart::ChartThemeLight);
 
-    // Create chart view
+    // 🔹 Create chart view
     QChartView* chartView = new QChartView(chart);
     chartView->setRenderHint(QPainter::Antialiasing);
 
-    // Close button
+    // 🔹 Create dialog container
+    QDialog* dialog = new QDialog(this);
+    dialog->setWindowTitle("Statistiques des véhicules par état");
+    dialog->resize(800, 600);
+    dialog->setModal(true);
+
     QPushButton* closeButton = new QPushButton("Fermer");
     closeButton->setFixedWidth(120);
     closeButton->setStyleSheet(
         "QPushButton { background-color: #f44336; color: white; border-radius: 8px; padding: 6px; }"
         "QPushButton:hover { background-color: #d32f2f; }"
-    );
-
-    // Create dialog container
-    QDialog* dialog = new QDialog(this);
-    dialog->setWindowTitle("Statistiques des véhicules");
-    dialog->resize(800, 600);
-    dialog->setModal(true);
+        );
 
     QVBoxLayout* layout = new QVBoxLayout(dialog);
     layout->addWidget(chartView);
     layout->addWidget(closeButton, 0, Qt::AlignCenter);
 
-    // Connect close button
     QObject::connect(closeButton, &QPushButton::clicked, dialog, &QDialog::accept);
 
-    // Center the dialog on main window
     QRect parentRect = this->geometry();
     int x = parentRect.center().x() - dialog->width() / 2;
     int y = parentRect.center().y() - dialog->height() / 2;
     dialog->move(x, y);
 
-    // Auto delete and show
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->show();
 
     return nullptr;
 }
-
 void MainWindow::on_pushButton_3_clicked()
 {
-    createVehiculePieChart();
+    createVehiculePieChart();  // ✅ just call it, no need for message box
+}
+void MainWindow::onTriBoxChanged(const QString &text)
+{
+    qDebug() << "🔄 [DEBUG] Tri demandé :" << text;
+
+    ui->tableau_3->setSortingEnabled(true);
+
+    if (text == "A-Z") {
+        qDebug() << "🔠 [DEBUG] Tri A-Z sur colonne 'Marque' (index 2)";
+        ui->tableau_3->sortItems(2, Qt::AscendingOrder);
+    }
+    else if (text == "Z-A") {
+        qDebug() << "🔠 [DEBUG] Tri Z-A sur colonne 'Marque' (index 2)";
+        ui->tableau_3->sortItems(2, Qt::DescendingOrder);
+    }
+    else if (text == "Date croissant") {
+        qDebug() << "📅 [DEBUG] Tri DATE croissant (ancien -> récent) sur ORDER_DATE (index 8)";
+        ui->tableau_3->sortItems(8, Qt::AscendingOrder);
+    }
+    else if (text == "date decroissant") {
+        qDebug() << "📅 [DEBUG] Tri DATE décroissant (récent -> ancien) sur ORDER_DATE (index 8)";
+        ui->tableau_3->sortItems(8, Qt::DescendingOrder);
+    }
+    else {
+        qDebug() << "⚠️ [DEBUG] Option inconnue :" << text;
+    }
+
+    // Affiche la première valeur de date pour vérifier l'ordre
+    if (ui->tableau_3->rowCount() > 0) {
+        QString firstDate = ui->tableau_3->item(0, 8)->text();
+        qDebug() << "📌 [DEBUG] Première valeur ORDER_DATE après tri =" << firstDate;
+    } else {
+        qDebug() << "⚠️ [DEBUG] Tableau vide !";
+    }
 }
 
+
+
+
+void MainWindow::on_btnSendChat_clicked()
+
+{
+    QString userMessage = ui->chatInput->text().trimmed();
+    if (userMessage.isEmpty())
+        return;
+
+    ui->chatHistory->append("<b>Vous :</b> " + userMessage);
+    ui->chatInput->clear();
+
+    sendMessageToAzureAI(userMessage);
+}
+void MainWindow::sendMessageToAzureAI(const QString &message)
+{
+    qDebug() << "🚀 sendMessageToAzureAI() démarre";
+    //preparation des informations de connextion azur
+    QString endpoint = "https://ai-kassem.cognitiveservices.azure.com"; // url de service
+    QString apiKey = "";  // placeholder
+    QString apiVersion = "2024-12-01-preview";
+    QString model = "gpt-4o";
+
+    QString url = endpoint + "/openai/deployments/" + model + "/chat/completions?api-version=" + apiVersion;
+
+    qDebug() << "🌍 URL Azure =" << url;
+    //creaton de la requette HTTP
+    QNetworkRequest request{ QUrl(url) };
+    request.setRawHeader("Content-Type", "application/json");
+    request.setRawHeader("api-key", apiKey.toUtf8());
+
+    // role de l’IA
+    QString systemPrompt = R"(
+Tu es SmartHelp, assistant SmartCity. Réponds toujours en texte simple, sans markdown, en maximum 3 lignes. Donne des explications claires et courtes sur l’utilisation des fonctions, champs, erreurs ou actions dans l’application.
+Ton rôle est d’aider l’utilisateur à comprendre et utiliser les fonctionnalités de l’application de manière simple, claire et utile.
+
+Voici ce que tu dois faire :
+
+1. Expliquer les modules et fonctionnalités de l’application SmartCity, notamment :
+   • Gestion des véhicules (ajouter, modifier, supprimer, rechercher)
+   • Gestion des résidents
+   • Gestion des employés
+   • Gestion des incidents et maintenance
+   • Historique, logs et états des objets
+   • Interaction avec l’interface Qt : boutons, champs, tables, filtres
+
+2. Fournir des explications détaillées sur chaque champ d’un formulaire :
+   • immatriculation
+   • marque
+   • modèle
+   • type
+   • état
+   • service
+   • date
+   • identifiants liés (ID_RES, ID_EMP, etc.)
+
+3. Guider l’utilisateur dans les actions :
+   • comment ajouter un véhicule
+   • comment modifier un véhicule
+   • comment supprimer un véhicule
+   • comment rechercher un véhicule
+   • comment éviter les erreurs
+
+4. Décrire les erreurs possibles :
+   • champ vide
+   • format incorrect
+   • date invalide (ex : date future)
+   • doublon d’immatriculation
+   • ID inexistant
+   • échec de connexion à la base Oracle
+
+5. Toujours répondre :
+   • poliment
+   • clairement
+   • avec des étapes simples
+   • en donnant des exemples quand nécessaire
+
+6. Ne pas inventer des fonctionnalités inexistantes. Si ce n'est pas dans SmartCity, tu expliques calmement que ce n’est pas prévu.
+
+Ton objectif : être un assistant intégré, très utile, qui explique l’utilisation de l’application SmartCity comme si tu étais un guide interactif.
+)";
+
+    QJsonObject systemMsg;
+    systemMsg["role"] = "system";
+    systemMsg["content"] = systemPrompt;
+
+    // --- JSON ---
+    QJsonObject userMsg;
+
+    userMsg["role"] = "user";
+    userMsg["content"] = message;
+
+    QJsonArray arr;
+    arr.append(systemMsg);
+    arr.append(userMsg);
+
+    QJsonObject payload;
+    payload["messages"] = arr;
+    payload["temperature"] = 0.7;
+
+    QByteArray jsonData = QJsonDocument(payload).toJson();
+
+    qDebug() << "📦 Payload =" << jsonData;
+
+    // --- SEND WITH CRASH DETECTION ---
+    QNetworkReply *reply = nullptr;
+
+    try {
+        reply = networkManager->post(request, jsonData);
+    }
+    catch(...) {
+        qDebug() << "💥 EXCEPTION : Crash pendant POST() !";
+        return;
+    }
+
+    connect(reply, &QNetworkReply::errorOccurred,
+            [](QNetworkReply::NetworkError code){
+                qDebug() << "❌ ERROR immediate =" << code;
+            });
+
+    connect(reply, &QNetworkReply::finished, [this, reply]() {
+
+        if (reply->error() != QNetworkReply::NoError) {
+            qDebug() << "❌ ERROR :" << reply->errorString();
+            ui->chatHistory->append("<b>Bot :</b> Erreur : " + reply->errorString());
+            reply->deleteLater();
+            return;
+        }
+
+        QByteArray data = reply->readAll();
+        qDebug() << "📩 Réponse =" << data;
+
+        QJsonDocument json = QJsonDocument::fromJson(data);
+        QString bot = json["choices"][0]["message"]["content"].toString();
+
+        ui->chatHistory->append("<b>Bot :</b> " + bot);
+
+        reply->deleteLater();
+    });
+}
+QString MainWindow::processChatMessage(const QString &msg)
+{
+    QString m = msg.toLower();
+
+    // --- Aide sur l'ajout ---
+    if (m.contains("ajouter") && m.contains("vehicule"))
+        return "Pour ajouter un véhicule : remplissez les champs à gauche puis cliquez sur 'Ajouter'.";
+
+    // --- Aide sur la modification ---
+    if (m.contains("modifier") || m.contains("update"))
+        return "Pour modifier : sélectionnez un véhicule dans le tableau puis cliquez sur 'Modifier'.";
+
+    // --- Aide sur la suppression ---
+    if (m.contains("supprimer") || m.contains("delete"))
+        return "Pour supprimer : sélectionnez un véhicule puis cliquez sur 'Supprimer'.";
+
+    // --- Aide sur la recherche ---
+    if (m.contains("recherche") || m.contains("chercher") || m.contains("filtrer"))
+        return "Tapez une immatriculation dans la barre de recherche pour filtrer les résultats.";
+
+    // --- Aide sur l'état ---
+    if (m.contains("etat") || m.contains("panne") || m.contains("usé") || m.contains("neuf"))
+        return "Les états disponibles sont : Neuf, Usé, En panne.";
+
+    // --- Aide sur la date de maintenance ---
+    if (m.contains("date") || m.contains("maintenance") || m.contains("maint"))
+        return "La date de maintenance doit être dans le passé. Vous pouvez trier par date via le bouton 'Tri par date'.";
+
+    // --- Aide sur le tri ---
+    if (m.contains("tri") || m.contains("trier"))
+        return "Le bouton 'Tri par date' permet de trier les véhicules du plus ancien au plus récent et inversement.";
+
+    // --- Message par défaut ---
+    return "Je n’ai pas compris 😅. Essayez avec des mots comme : ajouter véhicule, modifier, supprimer, tri, recherche, date maintenance.";
+}
+
+QString MainWindow::buildMaintenancePromptFromCurrentVehicle() const
+{
+    QString immat   = ui->immatline_2->text();
+    QString marque  = ui->marqueline_2->text();
+    QString modele  = ui->modeleline_2->text();
+    QString type    = ui->triemail_2->currentText();
+    QString etat    = ui->Etatline_2->currentText();
+    QString service = ui->serviceline_2->text();
+    QDate   date_maint = QDate::fromString(ui->datemaintline_2->text(), "dd/MM/yyyy");
+
+    // 🔥 Get today's REAL date from system
+    QString today = QDate::currentDate().toString("dd/MM/yyyy");
+
+    QString vehiculeInfo = QString(
+                               "Nous sommes le %1.\n"
+                               "Données véhicule :\n"
+                               "Immatriculation : %2\n"
+                               "Marque : %3\n"
+                               "Modèle : %4\n"
+                               "Type : %5\n"
+                               "État : %6\n"
+                               "Service : %7\n"
+                               "Date de dernière maintenance : %8\n\n"
+                               "En te basant uniquement sur ces données, propose une recommandation d'entretien "
+                               "pratique et cohérente avec la date du jour. Réponds en français, texte simple, "
+                               "sans markdown, en maximum 10 lignes."
+                               ).arg(
+                                   today,
+                                   immat,
+                                   marque,
+                                   modele,
+                                   type,
+                                   etat,
+                                   service,
+                                   date_maint.isValid() ? date_maint.toString("dd/MM/yyyy") : "inconnue"
+                                   );
+
+    return vehiculeInfo;
+}
+
+void MainWindow::sendRecommendationToAzureAI(const QString &message)
+{
+    qDebug() << "🚀 sendRecommendationToAzureAI() démarre";
+
+    QString endpoint   = "https://ai-kassem.cognitiveservices.azure.com";
+    QString apiKey     = "445NLYUwthBdj5EbFvxbCxV2XSdJWKYartumAOvqEFMtKEofmdpuJQQJ99BGACfhMk5XJ3w3AAAAACOGRpAA"; // ⚠️ garde ton vrai key en privé dans ton projet
+    QString apiVersion = "2024-12-01-preview";
+    QString model      = "gpt-4o";
+
+    QString url = endpoint
+                  + "/openai/deployments/"
+                  + model
+                  + "/chat/completions?api-version="
+                  + apiVersion;
+
+    qDebug() << "🌍 URL Azure =" << url;
+
+    QNetworkRequest request{ QUrl(url) };
+    request.setRawHeader("Content-Type", "application/json");
+    request.setRawHeader("api-key", apiKey.toUtf8());
+
+    // SYSTEM MESSAGE (spécial maintenance, max 3 lignes, texte simple)
+    QString systemPrompt = R"(Tu es SmartHelp, assistant SmartCity.
+Tu donnes des recommandations de maintenance pour les véhicules.
+Réponds toujours en français, en texte simple, sans markdown, en maximum 10 lignes.)";
+
+    QJsonObject systemMsg;
+    systemMsg["role"]    = "system";
+    systemMsg["content"] = systemPrompt;
+
+    // USER MESSAGE (les infos du véhicule + consigne déjà incluses dans message)
+    QJsonObject userMsg;
+    userMsg["role"]    = "user";
+    userMsg["content"] = message;
+
+    QJsonArray arr;
+    arr.append(systemMsg);
+    arr.append(userMsg);
+
+    QJsonObject payload;
+    payload["messages"]    = arr;
+    payload["temperature"] = 0.4; // un peu plus sérieux pour de la maintenance
+
+    QByteArray jsonData = QJsonDocument(payload).toJson();
+    qDebug() << "📦 Payload =" << jsonData;
+
+    QNetworkReply *reply = nullptr;
+
+    try {
+        reply = networkManager->post(request, jsonData);
+    }
+    catch (...) {
+        qDebug() << "💥 EXCEPTION : Crash pendant POST() !";
+        return;
+    }
+
+    connect(reply, &QNetworkReply::errorOccurred,
+            [](QNetworkReply::NetworkError code){
+                qDebug() << "❌ ERROR immediate =" << code;
+            });
+
+    connect(reply, &QNetworkReply::finished, [this, reply]() {
+
+        if (reply->error() != QNetworkReply::NoError) {
+            qDebug() << "❌ ERROR :" << reply->errorString();
+            ui->textRecom->setPlainText("Erreur Azure : " + reply->errorString());
+            reply->deleteLater();
+            return;
+        }
+
+        QByteArray data = reply->readAll();
+        qDebug() << "📩 Réponse =" << data;
+
+        QJsonDocument json = QJsonDocument::fromJson(data);
+        QString bot = json["choices"][0]["message"]["content"].toString();
+
+        // 📝 Afficher la reco dans la zone de texte
+        ui->textRecom->setPlainText(bot.trimmed());
+
+        reply->deleteLater();
+    });
+}
+void MainWindow::on_btnRecom_clicked()
+{
+    qDebug() << "🔎 [DEBUG] on_btnRecom_clicked() triggered";
+    qDebug() << "🔎 [DEBUG] selectedImmat current value:" << selectedImmat;
+
+    if (selectedImmat.isEmpty()) {
+        qDebug() << "⚠️ [DEBUG] No vehicle selected before recommendation!";
+        QMessageBox::warning(this,
+                             "Erreur",
+                             "Veuillez d'abord sélectionner un véhicule avant de demander une recommandation.");
+        return;
+    }
+
+    // Construire le message pour l'IA à partir du véhicule courant
+    QString prompt = buildMaintenancePromptFromCurrentVehicle();
+    qDebug() << "📨 [DEBUG] Maintenance prompt envoyé à Azure :" << prompt;
+
+    // Optionnel : nettoyer la zone avant la réponse
+    ui->textRecom->clear();
+    ui->textRecom->setPlainText("Génération de la recommandation en cours...");
+
+    // Lancer l'appel Azure
+    sendRecommendationToAzureAI(prompt);
+
+    // Afficher la page de recommandation
+    ui->stackedWidget_3->setCurrentWidget(ui->page_11);
+}
 // ========== MAISON CRUD IMPLEMENTATIONS ==========
 
 void MainWindow::loadMaisons()

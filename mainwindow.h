@@ -1,6 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
-
+#include <QNetworkAccessManager>
 #include <QMainWindow>
 #include <QTableWidget>
 #include <QMessageBox>
@@ -9,6 +9,7 @@
 #include "Employee.h"
 #include "resident.h"
 #include <QtCharts/QChartView>
+#include <QSortFilterProxyModel>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -47,12 +48,22 @@ private slots:
     void onTriTypeChanged();
     void onTriEtatChanged();
     // vehicule CRUD only (renommés pour éviter la connexion automatique de Qt)
-    void onAjouterVehicule();
-    void onModifierVehicule();
-    void onSupprimerVehicule();
-    void onExporterVehicule();
+    void on_ajouter_3_clicked();
+    void on_modifier_3_clicked();
+    void on_supprimer_3_clicked();
+    void on_exporter_3_clicked();
+    void on_btnChatbot_clicked();
+    void on_btnTriDate_clicked();
+    void on_btnBackFromChat_clicked();
+    void on_btnSendChat_clicked();
+    void sendMessageToAzureAI(const QString &message);
+    void on_btnRecom_clicked();
+    void on_btnBackFromRecom_clicked();
+    QString buildMaintenancePromptFromCurrentVehicle() const;
+    void sendRecommendationToAzureAI(const QString &message);
     QChartView* createVehiculePieChart();
     void on_pushButton_3_clicked();
+    void onTriBoxChanged(const QString &mode);
     // Maison CRUD only (renommés pour éviter la connexion automatique de Qt)
     void onAjouterMaison();
     void onModifierMaison();
@@ -68,6 +79,7 @@ private slots:
     void onModifierJardin();
     void onSupprimerJardin();
     void onExporterJardin();
+
 
 private:
     void connectButtons();
@@ -87,6 +99,10 @@ private:
     int selectedMaisonId = -1; // Stocke l'ancien ID de la maison sélectionnée
     int selectedResidentId = -1; // Stocke l'ancien ID du résident sélectionné
     int selectedJardinId = -1; // Stocke l'ancien ID du jardin sélectionné
+    QNetworkAccessManager *networkManager;
+    QSortFilterProxyModel *proxyModel;
+    bool triCroissant = true;
+    QString processChatMessage(const QString &msg);
     
     // Cache pour recherche/tri véhicules
     struct VehiculeData {

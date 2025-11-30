@@ -19,9 +19,9 @@ Vehicule::Vehicule(QString immat, QString marque, QString modele, QString type, 
 bool Vehicule::ajouter()
 {
     QSqlQuery query;
-    query.prepare("INSERT INTO \"SYSTEM\".\"VEHICULES\" "
-                  "(\"IMMATT\", \"MARQUE\", \"MODELE\", \"TYPE\", \"ETAT\", \"SRV\", \"DATE_DE_MAIN\") "
-                  "VALUES (:IMMAT, :MARQUE, :MODELE, :TYPE, :ETAT, :SERVICE, :DATE_MAINT)");
+    query.prepare("INSERT INTO SYSTEM.VEHICULE "
+                  "(ID_VEHI, IMMAT, MARQUE, MODELE, TYPE, ETAT, SERVICE, DATE_MAINT) "
+                  "VALUES (SEQ_VEHI.NEXTVAL, :IMMAT, :MARQUE, :MODELE, :TYPE, :ETAT, :SERVICE, :DATE_MAINT)");
 
     query.bindValue(":IMMAT", immat);
     query.bindValue(":MARQUE", marque);
@@ -42,8 +42,7 @@ bool Vehicule::ajouter()
 QSqlQuery Vehicule::afficher()
 {
     QSqlQuery query;
-    query.prepare("SELECT \"IMMATT\", \"MARQUE\", \"MODELE\", \"TYPE\", \"ETAT\", \"SRV\", \"DATE_DE_MAIN\" "
-                  "FROM \"SYSTEM\".\"VEHICULES\" ORDER BY \"IMMATT\" DESC");
+    query.prepare("SELECT IMMAT, MARQUE, MODELE, TYPE, ETAT, SERVICE, DATE_MAINT FROM SYSTEM.VEHICULE ORDER BY ID_VEHI DESC");
     query.exec();
     return query;
 }
@@ -51,10 +50,10 @@ QSqlQuery Vehicule::afficher()
 /*bool Vehicule::modifier(QString oldImmat)
 {
     QSqlQuery query;
-    query.prepare("UPDATE \"SYSTEM\".\"VEHICULE\" SET "
-                  "\"IMMAT\" = :IMMAT, \"MARQUE\" = :MARQUE, \"MODELE\" = :MODELE, \"TYPE\" = :TYPE, "
-                  "\"ETAT\" = :ETAT, \"SERVICE\" = :SERVICE, \"DATE_MAINT\" = :DATE_MAINT "
-                  "WHERE \"IMMAT\" = :OLD_IMMAT");
+    query.prepare("UPDATE SYSTEM.VEHICULE SET "
+                  "IMMAT = :IMMAT, MARQUE = :MARQUE, MODELE = :MODELE, TYPE = :TYPE, "
+                  "ETAT = :ETAT, SERVICE = :SERVICE, DATE_MAINT = :DATE_MAINT "
+                  "WHERE IMMAT = :OLD_IMMAT");
 
     query.bindValue(":IMMAT", immat);
     query.bindValue(":MARQUE", marque);
@@ -81,10 +80,10 @@ QSqlQuery Vehicule::afficher()
 bool Vehicule::modifier(QString oldImmat)
 {
     QSqlQuery query;
-    query.prepare("UPDATE \"SYSTEM\".\"VEHICULES\" SET "
-                  "\"IMMATT\" = :IMMAT, \"MARQUE\" = :MARQUE, \"MODELE\" = :MODELE, \"TYPE\" = :TYPE, "
-                  "\"ETAT\" = :ETAT, \"SRV\" = :SERVICE, \"DATE_DE_MAIN\" = :DATE_MAINT "
-                  "WHERE \"IMMATT\" = :OLD_IMMAT");
+    query.prepare("UPDATE SYSTEM.VEHICULE SET "
+                  "IMMAT = :IMMAT, MARQUE = :MARQUE, MODELE = :MODELE, TYPE = :TYPE, "
+                  "ETAT = :ETAT, SERVICE = :SERVICE, DATE_MAINT = :DATE_MAINT "
+                  "WHERE IMMAT = :OLD_IMMAT");
 
     query.bindValue(":IMMAT", immat);
     query.bindValue(":MARQUE", marque);
@@ -111,7 +110,7 @@ bool Vehicule::modifier(QString oldImmat)
 /*bool Vehicule::supprimer(QString immat)
 {
     QSqlQuery query;
-    query.prepare("DELETE FROM \"SYSTEM\".\"VEHICULE\" WHERE \"IMMAT\" = :IMMAT");
+    query.prepare("DELETE FROM SYSTEM.VEHICULE WHERE IMMAT = :IMMAT");
     query.bindValue(":IMMAT", immat);
 
     if (!query.exec()) {
@@ -124,7 +123,7 @@ bool Vehicule::modifier(QString oldImmat)
 bool Vehicule::supprimer(QString immat)
 {
     QSqlQuery query;
-    query.prepare("DELETE FROM \"SYSTEM\".\"VEHICULES\" WHERE \"IMMATT\" = :IMMAT");
+    query.prepare("DELETE FROM SYSTEM.VEHICULE WHERE IMMAT = :IMMAT");
     query.bindValue(":IMMAT", immat);
 
     if (!query.exec()) {
