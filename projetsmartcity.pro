@@ -29,6 +29,7 @@ RESOURCES += \
     resources.qrc
 
 SOURCES += \
+    alerte.cpp \
         main.cpp \
         mainwindow.cpp \
     connection.cpp \
@@ -40,6 +41,7 @@ SOURCES += \
     maison.cpp
 
 HEADERS += \
+    alerte.h \
         mainwindow.h \
     connection.h \
     Employee.h \

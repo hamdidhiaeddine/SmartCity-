@@ -1,384 +1,374 @@
 #include "maison.h"
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QDebug>
+#include <QSqlDatabase>
+#include <QTableWidget>
+#include <QTableWidgetItem>
+#include <QVariant>
 
-Maison::Maison() : id_maison(0), nbr_pieces(0) {}
+/* =====================
+ * CONSTRUCTEURS
+ * ===================== */
 
-Maison::Maison(QString adresse, QString statut, QString securite, int nbr_pieces, QString type)
+Maison::Maison(QObject *parent)
+    : QObject(parent), id(0), securite(0), nbrPieces(0)
 {
-    this->adresse = adresse.trimmed();
-    this->statut = statut.trimmed();
-    this->securite = securite.trimmed();
-    this->nbr_pieces = nbr_pieces;
-    this->type = type.trimmed();
 }
 
-// ✅ ADD
-bool Maison::ajouter(int id_maison, QString *errorMessage)
+Maison::Maison(int id, const QString &adresse, int securite, const QString &statut)
 {
-    QSqlQuery query;
-    QString lastError;
-    bool useProvidedId = (id_maison > 0); // Si ID fourni et > 0, l'utiliser
-    
-    // Debug: Afficher les valeurs avant insertion
-    qDebug() << "🔍 [DEBUG] Valeurs à insérer:";
-    qDebug() << "  - ID maison:" << (useProvidedId ? QString::number(id_maison) : "AUTO");
-    qDebug() << "  - Adresse:" << adresse;
-    qDebug() << "  - Statut:" << statut;
-    qDebug() << "  - Sécurité:" << securite;
-    qDebug() << "  - Nbr pièces:" << nbr_pieces;
-    qDebug() << "  - Type:" << type;
-    
-    // Si un ID est fourni, vérifier qu'il n'existe pas déjà
-    if (useProvidedId) {
-        if (idExists(id_maison)) {
-            QString errorMsg = QString("L'ID %1 existe déjà dans la base de données. Veuillez utiliser un autre ID.").arg(id_maison);
-            qDebug() << "❌" << errorMsg;
-            if (errorMessage) *errorMessage = errorMsg;
-            return false;
-        }
+    this->id = id;
+    this->adresse = adresse;
+    this->securite = securite;
+    this->statut = statut;
+    this->type = "";
+    this->nbrPieces = 0;
+}
+
+Maison::Maison(int id, const QString &adresse, int securite, const QString &statut,
+               const QString &type, int nbrPieces)
+{
+    this->id = id;
+    this->adresse = adresse;
+    this->securite = securite;
+    this->statut = statut;
+    this->type = type;
+    this->nbrPieces = nbrPieces;
+}
+
+/* =====================
+ * GETTERS / SETTERS
+ * ===================== */
+
+int Maison::getId() const { return id; }
+QString Maison::getAdresse() const { return adresse; }
+int Maison::getSecurite() const { return securite; }
+QString Maison::getStatut() const { return statut; }
+QString Maison::getType() const { return type; }
+int Maison::getNbrPieces() const { return nbrPieces; }
+
+void Maison::setId(int id) { this->id = id; }
+void Maison::setAdresse(const QString &adresse) { this->adresse = adresse; }
+void Maison::setSecurite(int securite) { this->securite = securite; }
+void Maison::setStatut(const QString &statut) { this->statut = statut; }
+void Maison::setType(const QString &type) { this->type = type; }
+void Maison::setNbrPieces(int nbrPieces) { this->nbrPieces = nbrPieces; }
+
+/* =====================
+ * CRUD
+ * ===================== */
+
+bool Maison::ajouter()
+{
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    q.prepare("INSERT INTO GEST_MAISON (ID, ADRESSE, SECURITE, STATUS, TYPE, NBRDESPIECES)"
+              "VALUES (:id, :ad, :sec, :st, :type, :nbr)");
+
+    q.bindValue(":id", id);
+    q.bindValue(":ad", adresse);
+    q.bindValue(":sec", securite);
+    q.bindValue(":st", statut);
+    q.bindValue(":type", type);
+    q.bindValue(":nbr", nbrPieces);
+
+    if(!q.exec()) {
+        qDebug() << q.lastError();
+        return false;
     }
-    
-    int finalId = id_maison;
-    
-    // Si aucun ID n'est fourni, générer automatiquement
-    if (!useProvidedId) {
-        // Essayer d'abord avec la séquence (comme pour VEHICULES)
-        query.prepare("INSERT INTO \"SYSTEM\".\"MAISON\" "
-                      "(\"ID_MAISON\", \"ADRESSE\", \"STATUT\", \"SECURITE\", \"NBR_PIECES\", \"TYPE\") "
-                      "VALUES (SEQ_MAISON.NEXTVAL, :ADRESSE, :STATUT, :SECURITE, :NBR_PIECES, :TYPE)");
+    return true;
+}
 
-        query.bindValue(":ADRESSE", adresse);
-        query.bindValue(":STATUT", statut);
-        query.bindValue(":SECURITE", securite);
-        query.bindValue(":NBR_PIECES", nbr_pieces);
-        query.bindValue(":TYPE", type);
-        
-        qDebug() << "🔍 [DEBUG] Valeurs bindées (avec séquence):";
-        qDebug() << "  - :ADRESSE =" << query.boundValue(":ADRESSE");
-        qDebug() << "  - :STATUT =" << query.boundValue(":STATUT");
-        qDebug() << "  - :SECURITE =" << query.boundValue(":SECURITE");
-        qDebug() << "  - :NBR_PIECES =" << query.boundValue(":NBR_PIECES");
-        qDebug() << "  - :TYPE =" << query.boundValue(":TYPE");
-
-        if (!query.exec()) {
-            QString errorText = query.lastError().text();
-            lastError = errorText;
-            qDebug() << "❌ SQL Error (ajouter avec séquence):" << errorText;
-            
-            // Si la séquence n'existe pas, calculer le prochain ID manuellement
-            if (errorText.contains("SEQ_MAISON", Qt::CaseInsensitive) || 
-                errorText.contains("sequence", Qt::CaseInsensitive) ||
-                errorText.contains("does not exist", Qt::CaseInsensitive)) {
-                
-                qDebug() << "⚠️ Séquence non trouvée, calcul du prochain ID...";
-                
-                // Récupérer le MAX(ID_MAISON) + 1
-                query.clear();
-                if (query.exec("SELECT NVL(MAX(\"ID_MAISON\"), 0) + 1 FROM \"SYSTEM\".\"MAISON\"")) {
-                    if (query.next()) {
-                        finalId = query.value(0).toInt();
-                        qDebug() << "✅ Prochain ID calculé:" << finalId;
-                    } else {
-                        finalId = 1; // Par défaut si la table est vide
-                    }
-                } else {
-                    finalId = 1; // Par défaut en cas d'erreur
-                }
-            } else {
-                qDebug() << "❌ SQL Error (ajouter):" << errorText;
-                qDebug() << "Requête:" << query.lastQuery();
-                if (errorMessage) *errorMessage = errorText;
-                return false;
-            }
+bool Maison::ajouter(int idOverride, QString *errorText)
+{
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    int useId = id;
+    if (idOverride > 0) useId = idOverride;
+    if (useId <= 0) {
+        QSqlQuery qid(QSqlDatabase::database("qt_oracle"));
+        if (qid.exec("SELECT NVL(MAX(ID),0)+1 FROM GEST_MAISON") && qid.next()) {
+            useId = qid.value(0).toInt();
         } else {
-            // Succès avec la séquence
-            qDebug() << "✅ Maison ajoutée avec succès (séquence)";
-            return true;
-        }
-    }
-    
-    // Utiliser l'ID fourni ou calculé
-    query.clear();
-    query.prepare("INSERT INTO \"SYSTEM\".\"MAISON\" "
-                  "(\"ID_MAISON\", \"ADRESSE\", \"STATUT\", \"SECURITE\", \"NBR_PIECES\", \"TYPE\") "
-                  "VALUES (:ID_MAISON, :ADRESSE, :STATUT, :SECURITE, :NBR_PIECES, :TYPE)");
-    
-    query.bindValue(":ID_MAISON", finalId);
-    query.bindValue(":ADRESSE", adresse);
-    query.bindValue(":STATUT", statut);
-    query.bindValue(":SECURITE", securite);
-    query.bindValue(":NBR_PIECES", nbr_pieces);
-    query.bindValue(":TYPE", type);
-    
-    qDebug() << "🔍 [DEBUG] Valeurs bindées (avec ID):";
-    qDebug() << "  - :ID_MAISON =" << query.boundValue(":ID_MAISON");
-    qDebug() << "  - :ADRESSE =" << query.boundValue(":ADRESSE");
-    qDebug() << "  - :STATUT =" << query.boundValue(":STATUT");
-    qDebug() << "  - :SECURITE =" << query.boundValue(":SECURITE");
-    qDebug() << "  - :NBR_PIECES =" << query.boundValue(":NBR_PIECES");
-    qDebug() << "  - :TYPE =" << query.boundValue(":TYPE");
-    
-    if (!query.exec()) {
-        lastError = query.lastError().text();
-        qDebug() << "❌ SQL Error (ajouter avec ID):" << lastError;
-        qDebug() << "Requête:" << query.lastQuery();
-        if (errorMessage) *errorMessage = lastError;
-        return false;
-    }
-    
-    // Vérifier que l'insertion a bien fonctionné en récupérant la dernière ligne insérée
-    qDebug() << "✅ Maison ajoutée avec succès";
-    
-    // Vérification: récupérer la dernière ligne insérée pour confirmer
-    query.clear();
-    if (query.exec("SELECT \"ID_MAISON\", \"ADRESSE\", \"STATUT\", \"SECURITE\", \"NBR_PIECES\", \"TYPE\" "
-                   "FROM \"SYSTEM\".\"MAISON\" WHERE ROWNUM = 1 ORDER BY \"ID_MAISON\" DESC")) {
-        if (query.next()) {
-            qDebug() << "✅ [VERIFICATION] Dernière ligne insérée:";
-            qDebug() << "  - ID:" << query.value(0).toString();
-            qDebug() << "  - Adresse:" << query.value(1).toString();
-            qDebug() << "  - Statut:" << query.value(2).toString();
-            qDebug() << "  - Sécurité:" << query.value(3).toString();
-            qDebug() << "  - Nbr pièces:" << query.value(4).toString();
-            qDebug() << "  - Type:" << query.value(5).toString();
-        }
-    }
-    
-    return true;
-}
-
-// ✅ UPDATE
-bool Maison::modifier(int oldId, int newId, QString *errorMessage)
-{
-    QSqlQuery query;
-    
-    // Debug: Afficher les valeurs avant modification
-    qDebug() << "🔍 [DEBUG] Valeurs à modifier:";
-    qDebug() << "  - Ancien ID (WHERE):" << oldId;
-    qDebug() << "  - Nouvel ID:" << (newId > 0 ? QString::number(newId) : "Garde l'ancien");
-    qDebug() << "  - Adresse:" << adresse;
-    qDebug() << "  - Statut:" << statut;
-    qDebug() << "  - Sécurité:" << securite;
-    qDebug() << "  - Nbr pièces:" << nbr_pieces;
-    qDebug() << "  - Type:" << type;
-    
-    // Si newId > 0 et différent de oldId, vérifier qu'il n'existe pas déjà
-    if (newId > 0 && newId != oldId) {
-        if (idExists(newId)) {
-            QString errorMsg = QString("L'ID %1 existe déjà dans la base de données. Veuillez utiliser un autre ID.").arg(newId);
-            qDebug() << "❌" << errorMsg;
-            if (errorMessage) *errorMessage = errorMsg;
+            if (errorText) *errorText = qid.lastError().text();
             return false;
         }
     }
-    
-    // Si newId > 0, on met à jour aussi l'ID, sinon on garde l'ancien
-    if (newId > 0 && newId != oldId) {
-        // Mettre à jour l'ID aussi
-        query.prepare("UPDATE \"SYSTEM\".\"MAISON\" SET "
-                      "\"ID_MAISON\" = :NEW_ID, "
-                      "\"ADRESSE\" = :ADRESSE, "
-                      "\"STATUT\" = :STATUT, "
-                      "\"SECURITE\" = :SECURITE, "
-                      "\"NBR_PIECES\" = :NBR_PIECES, "
-                      "\"TYPE\" = :TYPE "
-                      "WHERE \"ID_MAISON\" = :OLD_ID");
-        
-        query.bindValue(":NEW_ID", newId);
-        query.bindValue(":OLD_ID", oldId);
-    } else {
-        // Garder l'ancien ID
-        query.prepare("UPDATE \"SYSTEM\".\"MAISON\" SET "
-                      "\"ADRESSE\" = :ADRESSE, "
-                      "\"STATUT\" = :STATUT, "
-                      "\"SECURITE\" = :SECURITE, "
-                      "\"NBR_PIECES\" = :NBR_PIECES, "
-                      "\"TYPE\" = :TYPE "
-                      "WHERE \"ID_MAISON\" = :OLD_ID");
-        
-        query.bindValue(":OLD_ID", oldId);
-    }
 
-    query.bindValue(":ADRESSE", adresse);
-    query.bindValue(":STATUT", statut);
-    query.bindValue(":SECURITE", securite);
-    query.bindValue(":NBR_PIECES", nbr_pieces);
-    query.bindValue(":TYPE", type);
-    
-    qDebug() << "🔍 [DEBUG] Valeurs bindées:";
-    if (newId > 0 && newId != oldId) {
-        qDebug() << "  - :NEW_ID =" << query.boundValue(":NEW_ID");
-    }
-    qDebug() << "  - :OLD_ID =" << query.boundValue(":OLD_ID");
-    qDebug() << "  - :ADRESSE =" << query.boundValue(":ADRESSE");
-    qDebug() << "  - :STATUT =" << query.boundValue(":STATUT");
-    qDebug() << "  - :SECURITE =" << query.boundValue(":SECURITE");
-    qDebug() << "  - :NBR_PIECES =" << query.boundValue(":NBR_PIECES");
-    qDebug() << "  - :TYPE =" << query.boundValue(":TYPE");
-
-    if (!query.exec()) {
-        QString errorText = query.lastError().text();
-        qDebug() << "❌ SQL Error (modifier):" << errorText;
-        qDebug() << "Requête:" << query.lastQuery();
-        if (errorMessage) *errorMessage = errorText;
+    QSqlQuery qcheck(QSqlDatabase::database("qt_oracle"));
+    qcheck.prepare("SELECT 1 FROM GEST_MAISON WHERE ID=:id");
+    qcheck.bindValue(":id", useId);
+    if (qcheck.exec() && qcheck.next()) {
+        if (errorText) *errorText = QString("ID %1 existe déjà").arg(useId);
         return false;
     }
-    
-    // Vérifier que la modification a bien fonctionné (utiliser le nouvel ID si changé)
-    int checkId = (newId > 0 && newId != oldId) ? newId : oldId;
-    query.clear();
-    if (query.exec(QString("SELECT \"ID_MAISON\", \"ADRESSE\", \"STATUT\", \"SECURITE\", \"NBR_PIECES\", \"TYPE\" "
-                           "FROM \"SYSTEM\".\"MAISON\" WHERE \"ID_MAISON\" = %1").arg(checkId))) {
-        if (query.next()) {
-            qDebug() << "✅ [VERIFICATION] Maison modifiée:";
-            qDebug() << "  - ID:" << query.value(0).toString();
-            qDebug() << "  - Adresse:" << query.value(1).toString();
-            qDebug() << "  - Statut:" << query.value(2).toString();
-            qDebug() << "  - Sécurité:" << query.value(3).toString();
-            qDebug() << "  - Nbr pièces:" << query.value(4).toString();
-            qDebug() << "  - Type:" << query.value(5).toString();
-        }
+
+    q.prepare("INSERT INTO GEST_MAISON (ID, ADRESSE, SECURITE, STATUS, TYPE, NBRDESPIECES) VALUES (:id, :ad, :sec, :st, :type, :nbr)");
+    q.bindValue(":id", useId);
+    q.bindValue(":ad", adresse.trimmed());
+    q.bindValue(":sec", securite);
+    q.bindValue(":st", statut);
+    q.bindValue(":type", type);
+    q.bindValue(":nbr", nbrPieces);
+    if (!q.exec()) {
+        qDebug() << "INSERT GEST_MAISON error:" << q.lastError().text();
+        if (errorText) *errorText = q.lastError().text();
+        return false;
     }
-    
-    qDebug() << "✅ Maison modifiée avec succès";
+    id = useId;
+    qDebug() << "INSERT GEST_MAISON ok id=" << id << " adresse=" << adresse;
     return true;
 }
 
-// ✅ DELETE
-bool Maison::supprimer(int id, QString *errorMessage)
+bool Maison::modifier(int id)
 {
-    QSqlQuery query;
-    query.prepare("DELETE FROM \"SYSTEM\".\"MAISON\" WHERE \"ID_MAISON\" = :ID");
-    query.bindValue(":ID", id);
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    q.prepare("UPDATE GEST_MAISON SET ADRESSE=:ad, SECURITE=:sec, STATUS=:st,"
+              "TYPE=:type, NBRDESPIECES=:nbr WHERE ID=:id");
 
-    if (!query.exec()) {
-        QString errorText = query.lastError().text();
-        qDebug() << "❌ SQL Error (supprimer):" << errorText;
-        if (errorMessage) *errorMessage = errorText;
+    q.bindValue(":id", id);
+    q.bindValue(":ad", adresse);
+    q.bindValue(":sec", securite);
+    q.bindValue(":st", statut);
+    q.bindValue(":type", type);
+    q.bindValue(":nbr", nbrPieces);
+
+    return q.exec();
+}
+
+bool Maison::modifier(int oldId, int newId, QString *errorText)
+{
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    int targetId = oldId;
+    if (newId > 0 && newId != oldId) {
+        QSqlQuery exists(QSqlDatabase::database("qt_oracle"));
+        exists.prepare("SELECT 1 FROM GEST_MAISON WHERE ID=:id");
+        exists.bindValue(":id", newId);
+        if (exists.exec() && exists.next()) {
+            if (errorText) *errorText = QString("L'ID %1 existe déjà").arg(newId);
+            return false;
+        }
+        targetId = newId;
+    }
+
+    q.prepare("UPDATE GEST_MAISON SET ID=:newid, ADRESSE=:ad, SECURITE=:sec, STATUS=:st, TYPE=:type, NBRDESPIECES=:nbr WHERE ID=:oldid");
+    q.bindValue(":newid", targetId);
+    q.bindValue(":ad", adresse);
+    q.bindValue(":sec", securite);
+    q.bindValue(":st", statut);
+    q.bindValue(":type", type);
+    q.bindValue(":nbr", nbrPieces);
+    q.bindValue(":oldid", oldId);
+    if (!q.exec()) {
+        if (errorText) *errorText = q.lastError().text();
         return false;
     }
-    qDebug() << "✅ Maison supprimée avec succès";
+    id = targetId;
     return true;
 }
 
-// ✅ DISPLAY
+bool Maison::supprimer(int id)
+{
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    q.prepare("DELETE FROM GEST_MAISON WHERE ID=:id");
+    q.bindValue(":id", id);
+    return q.exec();
+}
+
+bool Maison::supprimer(int id, QString *errorText)
+{
+    QSqlDatabase db = QSqlDatabase::database("qt_oracle");
+    db.transaction();
+    QSqlQuery q(db);
+    q.prepare("DELETE FROM GEST_MAISON WHERE ID=:id");
+    q.bindValue(":id", id);
+    if (!q.exec()) {
+        if (errorText) *errorText = q.lastError().text();
+        db.rollback();
+        return false;
+    }
+    if (!db.commit()) {
+        if (errorText) *errorText = db.lastError().text();
+        db.rollback();
+        return false;
+    }
+    return true;
+}
+
+bool Maison::rechercher(int id)
+{
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    q.prepare("SELECT * FROM GEST_MAISON WHERE ID=:id");
+    q.bindValue(":id", id);
+
+    if(!q.exec() || !q.next()) return false;
+
+    this->id = q.value("ID").toInt();
+    adresse  = q.value("ADRESSE").toString();
+    statut   = q.value("STATUS").toString();
+    securite = q.value("SECURITE").toInt();
+    type     = q.value("TYPE").toString();
+    nbrPieces= q.value("NBRDESPIECES").toInt();
+
+    return true;
+}
+
+QSqlQueryModel* Maison::afficher()
+{
+    QSqlQueryModel *model = new QSqlQueryModel();
+    model->setQuery(
+        "SELECT ID, ADRESSE, SECURITE, STATUS, TYPE, NBRDESPIECES FROM GEST_MAISON ORDER BY ID ASC",
+        QSqlDatabase::database("qt_oracle")
+        );
+    return model;
+}
+
 void Maison::afficher(QTableWidget *table)
 {
-    if (!table) {
-        qDebug() << "❌ Table widget is null";
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    q.prepare("SELECT ID, ADRESSE, SECURITE, STATUS, TYPE, NBRDESPIECES FROM GEST_MAISON ORDER BY ID ASC");
+    if (!q.exec()) {
+        table->clear();
+        table->setRowCount(0);
+        table->setColumnCount(0);
         return;
     }
-
-    QSqlQuery query;
-    query.prepare("SELECT \"ID_MAISON\", \"ADRESSE\", \"STATUT\", \"SECURITE\", \"NBR_PIECES\", \"TYPE\" "
-                  "FROM \"SYSTEM\".\"MAISON\" ORDER BY \"ID_MAISON\" DESC");
-
-    if (!query.exec()) {
-        qDebug() << "❌ SQL Error (afficher):" << query.lastError().text();
-        return;
+    QVector<QVector<QString>> rows;
+    while (q.next()) {
+        QVector<QString> r;
+        r << q.value(0).toString()
+          << q.value(1).toString()
+          << q.value(2).toString()
+          << q.value(3).toString()
+          << q.value(4).toString()
+          << q.value(5).toString();
+        rows.push_back(r);
     }
-
-    table->setRowCount(0);
+    table->clear();
     table->setColumnCount(6);
-
-    QStringList headers = {"ID maison", "Adresse", "Statut", "Sécurité", "Nbr pièces", "Type"};
+    table->setRowCount(rows.size());
+    QStringList headers; headers << "ID Maison" << "Adresse" << "Sécurité" << "Statut" << "Type" << "Nbr Pièces";
     table->setHorizontalHeaderLabels(headers);
-
-    int row = 0;
-    while (query.next()) {
-        table->insertRow(row);
-        for (int col = 0; col < 6; ++col) {
-            QTableWidgetItem *item = new QTableWidgetItem(query.value(col).toString());
-            table->setItem(row, col, item);
+    for (int i = 0; i < rows.size(); ++i) {
+        const auto &r = rows[i];
+        for (int c = 0; c < r.size(); ++c) {
+            table->setItem(i, c, new QTableWidgetItem(r[c]));
         }
-        row++;
     }
-
-    qDebug() << "✅ Données MAISON chargées:" << row << "lignes";
 }
 
-// Validation methods
+/* =============================
+ * STATISTIQUES : STATUT
+ * ============================= */
+
+QMap<QString,int> Maison::getStatistiquesStatus()
+{
+    QMap<QString,int> stats;
+    stats["vide"] = 0;
+    stats["occupe"] = 0;
+
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    q.prepare("SELECT STATUS FROM GEST_MAISON");
+    if (!q.exec()) return {{"vide",0},{"occupe",0},{"total",0}};
+
+    int total = 0;
+    while(q.next()) {
+        QString s = q.value(0).toString().toLower();
+
+        if(s.contains("vide")) stats["vide"]++;
+        else stats["occupe"]++;
+
+        total++;
+    }
+
+    stats["total"] = total;
+    return stats;
+}
+
+/* =============================
+ * STATISTIQUES : NIVEAU
+ * ============================= */
+
+QMap<QString,int> Maison::getStatistiquesNiveauSecurite()
+{
+    QMap<QString,int> stats;
+    stats["danger"] = 0;
+    stats["moyen"]  = 0;
+    stats["bon"]    = 0;
+
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    q.prepare("SELECT SECURITE FROM GEST_MAISON");
+    if (!q.exec()) return {{"danger",0},{"moyen",0},{"bon",0},{"total",0}};
+
+    int total = 0;
+    while(q.next()) {
+        int s = q.value(0).toInt();
+
+        if(s < 2) stats["danger"]++;
+        else if(s <= 3) stats["moyen"]++;
+        else stats["bon"]++;
+
+        total++;
+    }
+
+    stats["total"] = total;
+    return stats;
+}
+
 bool Maison::validateAdresse(const QString &adresse, QString &error)
 {
     QString trimmed = adresse.trimmed();
-    if (trimmed.isEmpty()) {
-        error = "L'adresse ne peut pas être vide.";
-        return false;
-    }
-    if (trimmed.length() > 20) {
-        error = "L'adresse ne peut pas dépasser 20 caractères.";
-        return false;
-    }
+    if (trimmed.isEmpty()) { error = "Adresse requise"; return false; }
+    if (trimmed.length() > 200) { error = "Adresse trop longue (max 200)"; return false; }
+    return true;
+}
+
+bool Maison::validateSecurite(const QString &securiteText, QString &error)
+{
+    bool ok=false; int s = securiteText.trimmed().toInt(&ok);
+    if (!ok) { error = "Sécurité doit être numérique"; return false; }
+    if (s < 0 || s > 10) { error = "Sécurité doit être entre 0 et 10"; return false; }
     return true;
 }
 
 bool Maison::validateStatut(const QString &statut, QString &error)
 {
-    QString trimmed = statut.trimmed();
-    if (trimmed.isEmpty()) {
-        error = "Le statut ne peut pas être vide.";
-        return false;
-    }
-    QStringList validStatuts = {"occupé", "vide", "en maintenance"};
-    if (!validStatuts.contains(trimmed, Qt::CaseInsensitive)) {
-        error = "Le statut doit être: occupé, vide, ou en maintenance.";
-        return false;
-    }
-    return true;
-}
-
-bool Maison::validateSecurite(const QString &securite, QString &error)
-{
-    QString trimmed = securite.trimmed();
-    if (trimmed.isEmpty()) {
-        error = "Le niveau de sécurité ne peut pas être vide.";
-        return false;
-    }
-    if (trimmed.length() > 20) {
-        error = "Le niveau de sécurité ne peut pas dépasser 20 caractères.";
-        return false;
-    }
-    return true;
-}
-
-bool Maison::validateNbrPieces(int nbr_pieces, QString &error)
-{
-    if (nbr_pieces < 0) {
-        error = "Le nombre de pièces ne peut pas être négatif.";
-        return false;
-    }
-    if (nbr_pieces > 20) {
-        error = "Le nombre de pièces ne peut pas dépasser 20.";
-        return false;
-    }
+    QString t = statut.trimmed().toLower();
+    if (t.isEmpty()) { error = "Statut requis"; return false; }
+    if (t != "vide" && t != "occupe" && t != "occupé") { error = "Statut invalide (vide/occupé)"; return false; }
     return true;
 }
 
 bool Maison::validateType(const QString &type, QString &error)
 {
-    QString trimmed = type.trimmed();
-    if (trimmed.isEmpty()) {
-        error = "Le type ne peut pas être vide.";
-        return false;
-    }
-    QStringList validTypes = {"App", "Villa"};
-    if (!validTypes.contains(trimmed, Qt::CaseInsensitive)) {
-        error = "Le type doit être: App ou Villa.";
-        return false;
-    }
+    QString t = type.trimmed();
+    if (t.isEmpty()) { error = "Type requis"; return false; }
+    if (t.length() > 50) { error = "Type trop long (max 50)"; return false; }
     return true;
 }
 
-// Vérifie si un ID existe déjà dans la base de données
+bool Maison::validateNbrPieces(int nbrPieces, QString &error)
+{
+    if (nbrPieces <= 0) { error = "Nombre de pièces doit être > 0"; return false; }
+    if (nbrPieces > 50) { error = "Nombre de pièces trop grand"; return false; }
+    return true;
+}
+
 bool Maison::idExists(int id)
 {
-    QSqlQuery query;
-    query.prepare("SELECT 1 FROM \"SYSTEM\".\"MAISON\" WHERE \"ID_MAISON\" = :ID");
-    query.bindValue(":ID", id);
-    
-    if (query.exec() && query.next()) {
-        qDebug() << "⚠️ ID" << id << "existe déjà dans la base de données";
-        return true;
-    }
-    
-    return false;
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    q.prepare("SELECT 1 FROM GEST_MAISON WHERE ID=:id");
+    q.bindValue(":id", id);
+    return q.exec() && q.next();
+}
+// Convenience constructor used by UI: adresse, statut, securiteText, nbrPieces, type
+Maison::Maison(const QString &adresseIn, const QString &statutIn, const QString &securiteText, int nbrPiecesIn, const QString &typeIn)
+{
+    id = 0;
+    adresse = adresseIn;
+    statut = statutIn;
+    bool ok = false;
+    int sec = securiteText.trimmed().toInt(&ok);
+    securite = ok ? sec : 0;
+    type = typeIn;
+    nbrPieces = nbrPiecesIn;
 }

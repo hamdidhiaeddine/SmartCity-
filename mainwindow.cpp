@@ -42,7 +42,35 @@
 #include <QNetworkReply>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include "connection.h"
 #include <QJsonArray>
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+
+#include "maison.h"
+#include "alerte.h"
+
+#include <QSqlQuery>
+#include <QSqlRecord>
+#include <QDesktopServices>
+#include <QUrl>
+
+#include <QMessageBox>
+#include <QSqlQueryModel>
+#include <QTableWidgetItem>
+#include <QFileDialog>
+#include <QInputDialog>
+#include <QTextStream>
+#include <QDate>
+#include <QPrinter>
+#include <QTextDocument>
+#include <QGraphicsView>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QUrlQuery>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -50,6 +78,15 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    this->setStyleSheet("QLineEdit { color: black; }");
+    if (ui->idmaisonline) ui->idmaisonline->setStyleSheet("color: black; background-color: white;");
+    if (ui->adresseline_2) ui->adresseline_2->setStyleSheet("color: black; background-color: white;");
+    if (ui->nivsecline) ui->nivsecline->setStyleSheet("color: black; background-color: white;");
+    net = new QNetworkAccessManager(this);
+    sceneCarte = new QGraphicsScene(this);
+    viewCarte = new QGraphicsView(sceneCarte, ui->cruds_10);
+    viewCarte->setGeometry(QRect(720, 80, 370, 230));
+    viewCarte->setStyleSheet("background-color: white;");
     connect(ui->tribox, &QComboBox::currentTextChanged,
             this, &MainWindow::onTriBoxChanged);
     networkManager = new QNetworkAccessManager(this);
@@ -61,9 +98,14 @@ MainWindow::MainWindow(QWidget *parent)
     ui->logo->setScaledContents(true);
 
     connectButtons();
+    connectAlerteButtons();
     connectJardinUi();
     refreshJardinTable();
     ui->stackedWidget->setCurrentWidget(ui->pageEmployes);
+    if (ui->tableau_7) ui->tableau_7->setSortingEnabled(true);
+    if (ui->triMaisons) connect(ui->triMaisons, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onTriMaisonsChanged);
+    if (ui->rechercheMaisons) connect(ui->rechercheMaisons, &QLineEdit::textChanged, this, &MainWindow::onRechercheMaisonsChanged);
+    if (ui->btnExporterMaisons) connect(ui->btnExporterMaisons, &QPushButton::clicked, this, &MainWindow::onExporterMaison);
     connect(ui->tableau_3, &QTableWidget::cellClicked, this, [this](int row, int){
         qDebug() << "🟢 [DEBUG] cellClicked fired - row =" << row;
 
@@ -118,13 +160,18 @@ void MainWindow::connectButtons()
     }
 
     // CRUD Véhicules (connexion manuelle uniquement, pas de connexion automatique)
+    connect(ui->ajouter_3,  &QPushButton::clicked, this, &MainWindow::on_ajouter_3_clicked);
+    connect(ui->modifier_3, &QPushButton::clicked, this, &MainWindow::on_modifier_3_clicked);
+    connect(ui->supprimer_3,&QPushButton::clicked, this, &MainWindow::on_supprimer_3_clicked);
+    connect(ui->exporter_3,&QPushButton::clicked, this, &MainWindow::on_exporter_3_clicked);
 
-
-    // CRUD Maisons (connexion manuelle uniquement, pas de connexion automatique)
+    // CRUD Maisons
     connect(ui->ajouter_7, &QPushButton::clicked, this, &MainWindow::onAjouterMaison);
     connect(ui->modifier_7, &QPushButton::clicked, this, &MainWindow::onModifierMaison);
     connect(ui->supprimer_6, &QPushButton::clicked, this, &MainWindow::onSupprimerMaison);
-    connect(ui->exporter_7, &QPushButton::clicked, this, &MainWindow::onExporterMaison);
+    if (ui->Alertes) {
+        connect(ui->Alertes, &QPushButton::clicked, this, &MainWindow::on_Alertes_clicked);
+    }
     
     // CRUD Residents (connexion manuelle uniquement, pas de connexion automatique)
     connect(ui->ajouter_5, &QPushButton::clicked, this, &MainWindow::onAjouterResident);
@@ -144,13 +191,13 @@ void MainWindow::connectButtons()
         
         qDebug() << "🔍 [DEBUG] Maison sélectionnée - Ancien ID stocké:" << selectedMaisonId;
         
-        // Fill inputs from selected row
-        ui->idmaisonline->setText(oldIdStr);
-        ui->adresseline_2->setText(ui->tableau_7->item(row, 1)->text());
-        ui->nivsecline->setText(ui->tableau_7->item(row, 3)->text());
-        ui->statuschoix->setCurrentText(ui->tableau_7->item(row, 2)->text());
-        ui->typechoix_2->setCurrentText(ui->tableau_7->item(row, 5)->text());
-        ui->nbrpieceschoix->setCurrentText(ui->tableau_7->item(row, 4)->text());
+    // Fill inputs from selected row
+    ui->idmaisonline->setText(oldIdStr);
+    ui->adresseline_2->setText(ui->tableau_7->item(row, 1)->text());
+    ui->nivsecline->setText(ui->tableau_7->item(row, 2)->text());
+    ui->statuschoix->setCurrentText(ui->tableau_7->item(row, 3)->text());
+    ui->typechoix_2->setCurrentText(ui->tableau_7->item(row, 4)->text());
+    ui->nbrpieceschoix->setCurrentText(ui->tableau_7->item(row, 5)->text());
     });
     
     // Connect table selection for residents
@@ -1237,10 +1284,12 @@ QChartView* MainWindow::createVehiculePieChart()
 
     return nullptr;
 }
+
 void MainWindow::on_pushButton_3_clicked()
 {
     createVehiculePieChart();  // ✅ just call it, no need for message box
 }
+
 void MainWindow::onTriBoxChanged(const QString &text)
 {
     qDebug() << "🔄 [DEBUG] Tri demandé :" << text;
@@ -1274,6 +1323,32 @@ void MainWindow::onTriBoxChanged(const QString &text)
     } else {
         qDebug() << "⚠️ [DEBUG] Tableau vide !";
     }
+}
+
+void MainWindow::on_btnTriDate_clicked()
+{
+    if (!ui || !ui->tableau_3) return;
+    ui->tableau_3->setSortingEnabled(true);
+    ui->tableau_3->sortItems(8, triCroissant ? Qt::AscendingOrder : Qt::DescendingOrder);
+    triCroissant = !triCroissant;
+}
+
+// Recherche/tri véhicules (implémentations manquantes)
+void MainWindow::onRechercheVehiculeChanged()
+{
+    // No-op sûr: la recherche peut être gérée ailleurs
+}
+
+void MainWindow::onTriTypeChanged()
+{
+    if (ui && ui->tableau_3)
+        ui->tableau_3->sortItems(4, Qt::AscendingOrder);
+}
+
+void MainWindow::onTriEtatChanged()
+{
+    if (ui && ui->tableau_3)
+        ui->tableau_3->sortItems(5, Qt::AscendingOrder);
 }
 
 
@@ -1611,6 +1686,7 @@ void MainWindow::loadMaisons()
 
 void MainWindow::onAjouterMaison()
 {
+    Connection c; c.reconnect(); c.createOrPatchTableMaisons();
     // Read form values
     QString adresse = ui->adresseline_2->text().trimmed();
     QString securite = ui->nivsecline->text().trimmed();
@@ -1670,6 +1746,14 @@ void MainWindow::onAjouterMaison()
     
     if (maison.ajouter(id_maison, &errorMsg)) {
         QMessageBox::information(this, tr("Succès"), tr("Maison ajoutée avec succès."));
+        QSqlQuery verify(QSqlDatabase::database("qt_oracle"));
+        verify.prepare("SELECT ADRESSE FROM GEST_MAISON WHERE ID=:id");
+        verify.bindValue(":id", maison.getId());
+        if (verify.exec() && verify.next()) {
+            qDebug() << "Adresse insérée:" << verify.value(0).toString();
+        } else {
+            qDebug() << "Vérification adresse échouée:" << verify.lastError().text();
+        }
         // Clear input fields
         ui->idmaisonline->clear();
         ui->adresseline_2->clear();
@@ -1796,19 +1880,14 @@ void MainWindow::onModifierMaison()
 
 void MainWindow::onSupprimerMaison()
 {
-    // Get ID from input
+    Connection c; if (!c.reconnect()) { QMessageBox::warning(this, tr("Erreur DB"), tr("Connexion base de données indisponible.")); return; }
     QString idStr = ui->idmaisonline->text().trimmed();
-    if (idStr.isEmpty()) {
-        QMessageBox::warning(this, tr("Erreur"), tr("Veuillez sélectionner une maison à supprimer."));
-        return;
+    int id = -1; bool ok = false;
+    if (!idStr.isEmpty()) { id = idStr.toInt(&ok); }
+    if (!ok || id <= 0) {
+        if (selectedMaisonId > 0) { id = selectedMaisonId; ok = true; }
     }
-    
-    bool ok;
-    int id = idStr.toInt(&ok);
-    if (!ok) {
-        QMessageBox::warning(this, tr("Erreur"), tr("ID invalide."));
-        return;
-    }
+    if (!ok || id <= 0) { QMessageBox::warning(this, tr("Erreur"), tr("Veuillez sélectionner une maison valide à supprimer.")); return; }
 
     // Confirmation
     int ret = QMessageBox::question(this, tr("Confirmer"), tr("Supprimer la maison?"),
@@ -1817,7 +1896,6 @@ void MainWindow::onSupprimerMaison()
         return;
     }
 
-    // Delete
     Maison maison;
     QString errorMsg;
     if (maison.supprimer(id, &errorMsg)) {
@@ -1832,8 +1910,14 @@ void MainWindow::onSupprimerMaison()
         // Reload table
         loadMaisons();
     } else {
-        if (errorMsg.isEmpty()) {
-            errorMsg = tr("Vérifiez la console pour plus de détails.");
+        if (errorMsg.isEmpty()) { errorMsg = tr("Vérifiez la console pour plus de détails."); }
+        QSqlQuery verify(QSqlDatabase::database("qt_oracle"));
+        verify.prepare("SELECT 1 FROM GEST_MAISON WHERE ID=:id");
+        verify.bindValue(":id", id);
+        if (verify.exec() && !verify.next()) {
+            QMessageBox::information(this, tr("Info"), tr("La ligne n'existe plus."));
+            loadMaisons();
+            return;
         }
         QMessageBox::warning(this, tr("Erreur"), errorMsg);
     }
@@ -2624,4 +2708,433 @@ void MainWindow::onExporterJardin()
 
     painter.end();
     QMessageBox::information(this, tr("Succès"), tr("Le tableau a été exporté avec succès."));
+}
+
+/* ============================================================
+ *                     CARTOGRAPHIE / ALERTES
+ * ============================================================ */
+
+/* ============================================================
+ *                         NAVIGATION
+ * ============================================================ */
+// Les connexions générales sont déjà définies plus haut
+
+/* ============================================================
+ *                      CRUD MAISON
+ * ============================================================ */
+void MainWindow::connectMaisonButtons()
+{
+    connect(ui->ajouter_7,   &QPushButton::clicked, this, &MainWindow::onAjouterMaison);
+    connect(ui->modifier_7,  &QPushButton::clicked, this, &MainWindow::onModifierMaison);
+    connect(ui->supprimer_6, &QPushButton::clicked, this, &MainWindow::onSupprimerMaison);
+
+    connect(ui->tableau_7, &QTableWidget::itemSelectionChanged,
+            this, &MainWindow::onTableMaisonSelectionChanged);
+}
+
+/* ============================================================
+ *                   GESTION ALERTES
+ * ============================================================ */
+void MainWindow::connectAlerteButtons()
+{
+    connect(ui->btnRetourAlertes, &QPushButton::clicked,
+            this, &MainWindow::onRetourAlertes);
+
+    connect(ui->btnAfficherCarte, &QPushButton::clicked,
+            this, &MainWindow::onAfficherCarte);
+}
+
+void MainWindow::on_Alertes_clicked()
+{
+    ui->stackedWidget->setCurrentIndex(3);
+    ui->stackedWidget_5->setCurrentIndex(1);
+    refreshAlertes();
+}
+
+/* ============================================================
+ *                    AJOUT MAISON
+ * ============================================================ */
+// Les CRUD Maisons sont déjà définis plus haut dans le fichier
+
+/* ============================================================
+ *                 CHARGEMENT DES INPUTS
+ * ============================================================ */
+void MainWindow::onTableMaisonSelectionChanged()
+{
+    if (ui->tableau_7->selectedItems().isEmpty())
+        return;
+
+    int row = ui->tableau_7->currentRow();
+    int id  = ui->tableau_7->item(row, 0)->text().toInt();
+
+    loadMaisonToInputs(id);
+}
+
+void MainWindow::loadMaisonToInputs(int id)
+{
+    Maison m;
+    if (!m.rechercher(id)) return;
+
+    ui->idmaisonline->setText(QString::number(m.getId()));
+    ui->adresseline_2->setText(m.getAdresse());
+    ui->nivsecline->setText(QString::number(m.getSecurite()));
+    ui->statuschoix->setCurrentText(m.getStatut());
+    ui->typechoix_2->setCurrentText(m.getType());
+    ui->nbrpieceschoix->setCurrentText(QString::number(m.getNbrPieces()));
+}
+
+/* ============================================================
+ *                AFFICHER TABLE MAISONS
+ * ============================================================ */
+void MainWindow::refreshTableMaison()
+{
+    ui->tableau_7->clearContents();
+    ui->tableau_7->setRowCount(0);
+
+    QSqlQueryModel *model = Maison::afficher();
+
+    for (int i = 0; i < model->rowCount(); ++i) {
+        ui->tableau_7->insertRow(i);
+
+        for (int j = 0; j < model->columnCount(); ++j) {
+            ui->tableau_7->setItem(
+                i, j,
+                new QTableWidgetItem(model->data(model->index(i, j)).toString())
+                );
+        }
+    }
+}
+
+/* ============================================================
+ *                   STATISTIQUES
+ * ============================================================ */
+QMap<QString, int> MainWindow::getStatistiquesStatus()
+{
+    Maison m;
+    return m.getStatistiquesStatus();
+}
+
+QMap<QString, int> MainWindow::getStatistiquesNiveauSecurite()
+{
+    Maison m;
+    return m.getStatistiquesNiveauSecurite();
+}
+
+/* ------------------------------------------------------------ */
+void MainWindow::on_statistique_currentIndexChanged(int index)
+{
+    if (index == 0) return;
+
+    QDialog *d = new QDialog(this);
+    d->setWindowTitle("Statistiques des maisons");
+    d->setMinimumSize(650, 520);
+
+    QVBoxLayout *layout = new QVBoxLayout(d);
+    QPieSeries *series = new QPieSeries();
+    QString title;
+    int total = 0;
+
+    if (index == 1)
+    {
+        auto s = getStatistiquesStatus();
+        total = s["total"];
+        title = "Statistiques des statuts";
+
+        if (s["vide"] > 0)      series->append("Vide", s["vide"]);
+        if (s["occupe"] > 0)    series->append("Occupé", s["occupe"]);
+        if (s["enservice"] > 0) series->append("En service", s["enservice"]);
+    }
+
+    else if (index == 2)
+    {
+        auto s = getStatistiquesNiveauSecurite();
+        total = s["total"];
+        title = "Niveau de sécurité";
+
+        if (s["danger"] > 0)    series->append("Danger (<2)", s["danger"]);
+        if (s["moyen"] > 0)     series->append("Moyen (2-3)", s["moyen"]);
+        if (s["bon"] > 0)       series->append("Bon (>3)", s["bon"]);
+    }
+
+    QChart *chart = new QChart();
+    chart->addSeries(series);
+    chart->setTitle(title + " — Total : " + QString::number(total));
+    chart->legend()->setAlignment(Qt::AlignRight);
+    chart->legend()->setVisible(true);
+
+    QChartView *chartView = new QChartView(chart);
+    chartView->setRenderHint(QPainter::Antialiasing);
+    layout->addWidget(chartView);
+
+    QDialogButtonBox *box = new QDialogButtonBox(QDialogButtonBox::Ok);
+    layout->addWidget(box);
+    connect(box, &QDialogButtonBox::accepted, d, &QDialog::accept);
+
+    d->exec();
+}
+
+/* ============================================================
+ *                RECHERCHE, TRI, EXPORT
+ * ============================================================ */
+void MainWindow::clearMaisonInputs()
+{
+    ui->idmaisonline->clear();
+    ui->adresseline_2->clear();
+    ui->nivsecline->clear();
+    ui->statuschoix->setCurrentIndex(0);
+    ui->typechoix_2->setCurrentIndex(0);
+    ui->nbrpieceschoix->setCurrentIndex(0);
+}
+
+void MainWindow::onTriMaisonsChanged(int index)
+{
+    if (!ui->tableau_7) return;
+    switch (index) {
+    case 1: ui->tableau_7->sortItems(0, Qt::AscendingOrder); break;
+    case 2: ui->tableau_7->sortItems(0, Qt::DescendingOrder); break;
+    case 3: ui->tableau_7->sortItems(1, Qt::AscendingOrder); break;
+    case 4: ui->tableau_7->sortItems(2, Qt::AscendingOrder); break;
+    case 5: ui->tableau_7->sortItems(2, Qt::DescendingOrder); break;
+    case 6: ui->tableau_7->sortItems(3, Qt::AscendingOrder); break;
+    case 7: ui->tableau_7->sortItems(4, Qt::AscendingOrder); break;
+    default: break;
+    }
+}
+
+void MainWindow::onRechercheMaisonsChanged(const QString &text)
+{
+    QString t = text.trimmed();
+    for (int r = 0; r < ui->tableau_7->rowCount(); ++r) {
+        bool match = t.isEmpty();
+        if (!match) {
+            for (int c = 0; c < ui->tableau_7->columnCount(); ++c) {
+                QTableWidgetItem *it = ui->tableau_7->item(r, c);
+                if (it && it->text().contains(t, Qt::CaseInsensitive)) { match = true; break; }
+            }
+        }
+        ui->tableau_7->setRowHidden(r, !match);
+    }
+}
+
+// Recherche/Tri spécifiques non utilisés: retirés
+
+void MainWindow::onExporterMaisons()
+{
+    bool ok = false;
+    const QString choice = QInputDialog::getItem(
+        this, "Exporter les maisons", "Format", {"PDF", "CSV"}, 0, false, &ok);
+    if (!ok || choice.isEmpty()) return;
+    if (choice == "PDF") exporterMaisonsPDF(); else exporterMaisonsCSV();
+}
+
+void MainWindow::exporterMaisonsPDF()
+{
+    const QString path = QFileDialog::getSaveFileName(this, "Exporter PDF", QString(), "PDF (*.pdf)");
+    if (path.isEmpty()) return;
+
+    QString html;
+    html += "<h2>Liste des maisons</h2>";
+    html += "<table border='1' cellspacing='0' cellpadding='4'>";
+    html += "<tr>";
+    for (int c = 0; c < ui->tableau_7->columnCount(); ++c) {
+        QTableWidgetItem *h = ui->tableau_7->horizontalHeaderItem(c);
+        html += "<th>" + (h ? h->text() : QString("Col %1").arg(c)) + "</th>";
+    }
+    html += "</tr>";
+    for (int r = 0; r < ui->tableau_7->rowCount(); ++r) {
+        if (ui->tableau_7->isRowHidden(r)) continue;
+        html += "<tr>";
+        for (int c = 0; c < ui->tableau_7->columnCount(); ++c) {
+            QTableWidgetItem *it = ui->tableau_7->item(r, c);
+            html += "<td>" + (it ? it->text().toHtmlEscaped() : QString()) + "</td>";
+        }
+        html += "</tr>";
+    }
+    html += "</table>";
+
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(path);
+    QTextDocument doc;
+    doc.setHtml(html);
+    doc.print(&printer);
+}
+
+void MainWindow::exporterMaisonsCSV()
+{
+    const QString path = QFileDialog::getSaveFileName(this, "Exporter CSV", QString(), "CSV (*.csv)");
+    if (path.isEmpty()) return;
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return;
+    QTextStream out(&file);
+    for (int c = 0; c < ui->tableau_7->columnCount(); ++c) {
+        QTableWidgetItem *h = ui->tableau_7->horizontalHeaderItem(c);
+        out << (h ? h->text() : QString("Col %1").arg(c));
+        if (c < ui->tableau_7->columnCount() - 1) out << ",";
+    }
+    out << "\n";
+    for (int r = 0; r < ui->tableau_7->rowCount(); ++r) {
+        if (ui->tableau_7->isRowHidden(r)) continue;
+        for (int c = 0; c < ui->tableau_7->columnCount(); ++c) {
+            QTableWidgetItem *it = ui->tableau_7->item(r, c);
+            out << (it ? it->text() : QString());
+            if (c < ui->tableau_7->columnCount() - 1) out << ",";
+        }
+        out << "\n";
+    }
+    file.close();
+}
+
+void MainWindow::refreshAlertes()
+{
+    QSqlQuery query("SELECT ZONE, NIVEAU, STATUT, DATE_ALERTE FROM GEST_ALERTES",
+                    QSqlDatabase::database("qt_oracle"));
+
+    ui->tableau_10->clearContents();
+    ui->tableau_10->setRowCount(0);
+
+    QTableWidgetItem *headerZone = ui->tableau_10->horizontalHeaderItem(0);
+    if (headerZone) headerZone->setText("zone");
+    QTableWidgetItem *headerNiv = ui->tableau_10->horizontalHeaderItem(1);
+    if (headerNiv) headerNiv->setText("niveau");
+    QTableWidgetItem *headerStatut = ui->tableau_10->horizontalHeaderItem(2);
+    if (headerStatut) headerStatut->setText("statut");
+    QTableWidgetItem *headerDate = ui->tableau_10->horizontalHeaderItem(3);
+    if (headerDate) headerDate->setText("date");
+    QTableWidgetItem *headerLoc = ui->tableau_10->horizontalHeaderItem(4);
+    if (headerLoc) headerLoc->setText("Localisation");
+
+    int row = 0;
+    while (query.next()) {
+        ui->tableau_10->insertRow(row);
+
+        QString zone   = query.value(0).toString();
+        QString niveau = query.value(1).toString();
+        QString statut = query.value(2).toString();
+        QString dateA  = query.value(3).toString();
+
+        ui->tableau_10->setItem(row, 0, new QTableWidgetItem(zone));
+        ui->tableau_10->setItem(row, 1, new QTableWidgetItem(niveau));
+        ui->tableau_10->setItem(row, 2, new QTableWidgetItem(statut));
+        ui->tableau_10->setItem(row, 3, new QTableWidgetItem(dateA));
+
+        QPushButton *btn = new QPushButton("Localiser");
+        btn->setStyleSheet("background-color: #007bff; color: white; border-radius: 6px; padding: 4px 8px;");
+        connect(btn, &QPushButton::clicked, this, [this, zone]() { loadMapForZone(zone); });
+        ui->tableau_10->setCellWidget(row, 4, btn);
+
+        row++;
+    }
+
+    ui->tableau_10->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+}
+
+void MainWindow::onAfficherCarte()
+{
+    int row = ui->tableau_10->currentRow();
+    if (row < 0) {
+        QMessageBox::information(this, "Carte", "Veuillez sélectionner une alerte.");
+        return;
+    }
+    QString zone = ui->tableau_10->item(row, 0)->text();
+    loadMapForZone(zone);
+}
+
+void MainWindow::loadMapForZone(const QString &zone)
+{
+    QUrl geocode("https://nominatim.openstreetmap.org/search");
+    QUrlQuery query;
+    query.addQueryItem("q", zone);
+    query.addQueryItem("format", "json");
+    query.addQueryItem("limit", "1");
+    geocode.setQuery(query);
+    QNetworkRequest req(geocode);
+    req.setRawHeader("User-Agent", QByteArray("AtelierConnexion/1.0"));
+    QNetworkReply *r = net->get(req);
+    connect(r, &QNetworkReply::finished, this, [this, r]() {
+        if (r->error() != QNetworkReply::NoError) {
+            QMessageBox::warning(this, "Carte", "Géocodage indisponible.");
+            r->deleteLater();
+            return;
+        }
+        QByteArray data = r->readAll();
+        r->deleteLater();
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (!doc.isArray() || doc.array().isEmpty()) {
+            QMessageBox::information(this, "Carte", "Adresse introuvable.");
+            return;
+        }
+        QJsonObject obj = doc.array().first().toObject();
+        QString lat = obj.value("lat").toString();
+        QString lon = obj.value("lon").toString();
+        QUrl imgUrl(QString("http://staticmap.openstreetmap.de/staticmap.php?center=%1,%2&zoom=14&size=370x230&markers=%1,%2,red-pushpin").arg(lat, lon));
+        QNetworkRequest imgReq(imgUrl);
+        imgReq.setRawHeader("User-Agent", QByteArray("AtelierConnexion/1.0"));
+        QNetworkReply *ri = net->get(imgReq);
+        connect(ri, &QNetworkReply::finished, this, [this, ri, lat, lon]() {
+            if (ri->error() == QNetworkReply::NoError) {
+                QByteArray bytes = ri->readAll();
+                ri->deleteLater();
+                QPixmap pix;
+                if (pix.loadFromData(bytes)) {
+                    sceneCarte->clear();
+                    sceneCarte->addPixmap(pix);
+                    viewCarte->show();
+                    return;
+                }
+            }
+            ri->deleteLater();
+            bool okLat = false, okLon = false;
+            double dLat = lat.toDouble(&okLat);
+            double dLon = lon.toDouble(&okLon);
+            if (!okLat || !okLon) {
+                QMessageBox::warning(this, "Carte", "Localisation introuvable.");
+                return;
+            }
+            int zoom = 14;
+            double latRad = qDegreesToRadians(dLat);
+            double n = (1 << zoom);
+            int xTile = qFloor((dLon + 180.0) / 360.0 * n);
+            int yTile = qFloor((1.0 - log(tan(latRad) + 1.0 / cos(latRad)) / M_PI) / 2.0 * n);
+            QUrl tileUrl(QString("http://tile.openstreetmap.org/%1/%2/%3.png").arg(QString::number(zoom), QString::number(xTile), QString::number(yTile)));
+            QNetworkRequest tileReq(tileUrl);
+            tileReq.setRawHeader("User-Agent", QByteArray("AtelierConnexion/1.0"));
+            QNetworkReply *rt = net->get(tileReq);
+            connect(rt, &QNetworkReply::finished, this, [this, rt, dLat, dLon, zoom, xTile, yTile]() {
+                if (rt->error() != QNetworkReply::NoError) {
+                    QMessageBox::warning(this, "Carte", "Impossible de charger la localisation.");
+                    rt->deleteLater();
+                    return;
+                }
+                QByteArray tileBytes = rt->readAll();
+                rt->deleteLater();
+                QPixmap tilePix;
+                if (!tilePix.loadFromData(tileBytes)) {
+                    QMessageBox::information(this, "Carte", "Image de tuile invalide.");
+                    return;
+                }
+                double latRad2 = qDegreesToRadians(dLat);
+                double n2 = (1 << zoom);
+                double pixelX = ((dLon + 180.0) / 360.0) * 256.0 * n2;
+                double pixelY = ((1.0 - log(tan(latRad2) + 1.0 / cos(latRad2)) / M_PI) / 2.0) * 256.0 * n2;
+                double localX = pixelX - 256.0 * xTile;
+                double localY = pixelY - 256.0 * yTile;
+                QPixmap composed = tilePix.copy();
+                QPainter p(&composed);
+                p.setRenderHint(QPainter::Antialiasing, true);
+                p.setPen(QPen(Qt::red, 2));
+                p.setBrush(QBrush(Qt::red));
+                p.drawEllipse(QPointF(localX, localY), 6, 6);
+                p.end();
+                sceneCarte->clear();
+                sceneCarte->addPixmap(composed);
+                viewCarte->show();
+            });
+        });
+    });
+}
+
+void MainWindow::onRetourAlertes()
+{
+    ui->stackedWidget_5->setCurrentIndex(0);
 }

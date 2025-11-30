@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QDate>
+#include <QVector>
 
 struct Resident
 {

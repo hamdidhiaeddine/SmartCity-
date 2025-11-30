@@ -24,7 +24,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>3</number>
     </property>
     <widget class="QWidget" name="pageEmployes">
      <widget class="QLabel" name="label_8">
@@ -3198,68 +3198,93 @@ font: bold 11pt &quot;Arial&quot;;
         <property name="frameShape">
          <enum>QFrame::Shape::NoFrame</enum>
         </property>
-        <widget class="QLabel" name="recherche_5">
+        <widget class="QComboBox" name="statistique">
          <property name="geometry">
           <rect>
-           <x>10</x>
+           <x>560</x>
            <y>10</y>
-           <width>271</width>
-           <height>21</height>
+           <width>151</width>
+           <height>26</height>
           </rect>
          </property>
-         <property name="styleSheet">
-          <string notr="true">background-color: white;
-    gridline-color: #ccc;
-    font: 10pt &quot;Arial&quot;;</string>
-         </property>
-         <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700; color:#00007f;&quot;&gt;Rechercher&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
+         <item>
+          <property name="text">
+           <string>Choisir…</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Status</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Niveau de sécurité</string>
+          </property>
+         </item>
         </widget>
-        <widget class="QComboBox" name="triemail_5">
+        <widget class="QComboBox" name="triMaisons">
          <property name="geometry">
           <rect>
-           <x>360</x>
+           <x>340</x>
            <y>10</y>
-           <width>161</width>
-           <height>22</height>
+           <width>150</width>
+           <height>25</height>
           </rect>
          </property>
-         <property name="styleSheet">
-          <string notr="true">background-color: white;
-    gridline-color: #ccc;
-    font: 10pt &quot;Arial&quot;;</string>
-         </property>
+         <item>
+          <property name="text">
+           <string>Trier par...</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>ID (Croissant)</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>ID (Décroissant)</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Adresse</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Sécurité (Croissant)</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Sécurité (Décroissant)</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Statut</string>
+          </property>
+         </item>
          <item>
           <property name="text">
            <string>Type</string>
           </property>
          </item>
-         <item>
-          <property name="text">
-           <string/>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string/>
-          </property>
-         </item>
         </widget>
-        <widget class="QComboBox" name="trisalaire_5">
+        <widget class="QLineEdit" name="rechercheMaisons">
          <property name="geometry">
           <rect>
-           <x>680</x>
-           <y>10</y>
-           <width>151</width>
-           <height>22</height>
+           <x>70</x>
+           <y>20</y>
+           <width>200</width>
+           <height>25</height>
           </rect>
          </property>
-         <item>
-          <property name="text">
-           <string>Immatriculation</string>
-          </property>
-         </item>
+         <property name="placeholderText">
+          <string>Rechercher...</string>
+         </property>
         </widget>
        </widget>
        <widget class="QFrame" name="liste_6">
@@ -3520,25 +3545,6 @@ font: bold 11pt &quot;Arial&quot;;
         <property name="frameShape">
          <enum>QFrame::Shape::NoFrame</enum>
         </property>
-        <widget class="QLabel" name="comment_6">
-         <property name="geometry">
-          <rect>
-           <x>30</x>
-           <y>270</y>
-           <width>221</width>
-           <height>16</height>
-          </rect>
-         </property>
-         <property name="styleSheet">
-          <string notr="true">background-color: white;
-    gridline-color: #ccc;
-    font: 10pt &quot;Arial&quot;;
-</string>
-         </property>
-         <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700; color:#00007f;&quot;&gt;Comenter&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-        </widget>
         <widget class="QPushButton" name="ajouter_7">
          <property name="geometry">
           <rect>
@@ -3580,27 +3586,6 @@ font: bold 11pt &quot;Arial&quot;;
          </property>
          <property name="text">
           <string>Modifier</string>
-         </property>
-        </widget>
-        <widget class="QPushButton" name="exporter_7">
-         <property name="geometry">
-          <rect>
-           <x>430</x>
-           <y>310</y>
-           <width>151</width>
-           <height>18</height>
-          </rect>
-         </property>
-         <property name="styleSheet">
-          <string notr="true">QPushButton {
-    background-color: #007bff;
-    color: white;
-    border-radius: 5px;
-}
-</string>
-         </property>
-         <property name="text">
-          <string>Exporter PDF</string>
          </property>
         </widget>
         <widget class="QPushButton" name="supprimer_6">
@@ -3714,6 +3699,39 @@ QHeaderView::section {
           </property>
          </column>
         </widget>
+        <widget class="QPushButton" name="Alertes">
+         <property name="geometry">
+          <rect>
+           <x>690</x>
+           <y>350</y>
+           <width>93</width>
+           <height>29</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Alertes</string>
+         </property>
+        </widget>
+        <widget class="QPushButton" name="btnExporterMaisons">
+         <property name="geometry">
+          <rect>
+           <x>460</x>
+           <y>310</y>
+           <width>120</width>
+           <height>25</height>
+          </rect>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">QPushButton {
+    background-color: #007bff;
+    color: white;
+    border-radius: 5px;
+}</string>
+         </property>
+         <property name="text">
+          <string>Exporter</string>
+         </property>
+        </widget>
        </widget>
       </widget>
       <widget class="QWidget" name="page_15">
@@ -3757,8 +3775,8 @@ font: bold 11pt &quot;Arial&quot;;
           <rect>
            <x>80</x>
            <y>80</y>
-           <width>491</width>
-           <height>141</height>
+           <width>641</width>
+           <height>341</height>
           </rect>
          </property>
          <property name="styleSheet">
@@ -3852,8 +3870,8 @@ QHeaderView::section {
         <widget class="QLabel" name="idmaison_4">
          <property name="geometry">
           <rect>
-           <x>50</x>
-           <y>230</y>
+           <x>350</x>
+           <y>10</y>
            <width>311</width>
            <height>41</height>
           </rect>
@@ -3865,20 +3883,37 @@ QHeaderView::section {
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;🗺️ Localisation interactive &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
         </widget>
-        <widget class="QLabel" name="label_24">
+        <widget class="QPushButton" name="btnAfficherCarte">
          <property name="geometry">
           <rect>
-           <x>80</x>
-           <y>280</y>
-           <width>491</width>
-           <height>171</height>
+           <x>820</x>
+           <y>190</y>
+           <width>171</width>
+           <height>29</height>
           </rect>
          </property>
          <property name="text">
-          <string/>
+          <string>btnAfficherCarte</string>
          </property>
-         <property name="pixmap">
-          <pixmap>../SmartCity--main (1)/SmartCity--main/map.png</pixmap>
+        </widget>
+        <widget class="QPushButton" name="btnRetourAlertes">
+         <property name="geometry">
+          <rect>
+           <x>860</x>
+           <y>330</y>
+           <width>100</width>
+           <height>30</height>
+          </rect>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">QPushButton {
+    background-color: #6c757d;
+    color: white;
+    border-radius: 5px;
+}</string>
+         </property>
+         <property name="text">
+          <string>← Retour</string>
          </property>
         </widget>
        </widget>

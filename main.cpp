@@ -1,41 +1,39 @@
 #include "mainwindow.h"
-#include "authetification.h"
 #include <QApplication>
 #include <QMessageBox>
 #include "connection.h"
+#include <QSqlDatabase>
+#include <QDebug>
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    
-    // Étape 1: Vérifier la connexion à la base de données
+
+    // Connexion BD
     Connection c;
     bool test = c.createconnect();
-    if (!test) {
-        QMessageBox::critical(nullptr, QObject::tr("Erreur de base de données"),
-                              QObject::tr("La connexion à la base de données a échoué.\n"
-                                          "L'application ne peut pas démarrer."), 
-                              QMessageBox::Ok);
-        return -1; // Quitter l'application avec un code d'erreur
+
+    if (test) {
+
+        // Récupérer la connexion NOMMÉE ("qt_oracle")
+        QSqlDatabase db = QSqlDatabase::database("qt_oracle");
+
+        qDebug() << "=== Connexion BD OK ===";
+        qDebug() << "isValid =" << db.isValid();
+        qDebug() << "isOpen  =" << db.isOpen();
+
+        // Créer automatiquement la table GEST_ALERTES si elle n'existe pas
+        c.createTableAlertes();
+        c.createOrPatchTableMaisons();
+
+    } else {
+        qDebug() << "=== ECHEC connexion BD ===";
     }
-    
-    // Étape 2: Afficher le dialogue d'authentification
-    AUTHETIFICATION authDialog;
-    
-    // Si l'utilisateur annule ou ferme le dialogue d'authentification, quitter
-    if (authDialog.exec() != QDialog::Accepted) {
-        return 0; // Quitter proprement si l'authentification est annulée
-    }
-    
-    // Étape 3: Si l'authentification réussit, afficher la fenêtre principale
+
     MainWindow w;
     w.show();
-    
-    // Afficher un message de succès de connexion (optionnel)
-    QMessageBox::information(nullptr, QObject::tr("Connexion réussie"),
-                             QObject::tr("Connexion à la base de données réussie.\n"
-                                         "Bienvenue dans l'application."), 
-                             QMessageBox::Ok);
+
+    qDebug() << "Drivers SQL disponibles :" << QSqlDatabase::drivers();
 
     return a.exec();
 }

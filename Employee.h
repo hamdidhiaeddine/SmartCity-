@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QMap>
+#include <QVector>
 
 struct Employee
 {

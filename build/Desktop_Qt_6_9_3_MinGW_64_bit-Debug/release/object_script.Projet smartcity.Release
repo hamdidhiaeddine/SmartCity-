@@ -1,0 +1,15 @@
+release/alerte.o
+release/main.o
+release/mainwindow.o
+release/connection.o
+release/Employee.o
+release/InputController.o
+release/authetification.o
+release/resident.o
+release/vehicule.o
+release/maison.o
+release/qrc_resources.o
+release/moc_alerte.o
+release/moc_mainwindow.o
+release/moc_authetification.o
+release/moc_maison.o
