@@ -1,0 +1,120 @@
+╔══════════════════════════════════════════════════════════════════╗
+║     INSTALLATION DE LA BASE DE DONNÉES ORACLE - SMARTCITY        ║
+╚══════════════════════════════════════════════════════════════════╝
+
+📋 PROBLÈME DÉTECTÉ :
+---------------------
+L'utilisateur HIBA n'existe pas dans votre base de données Oracle.
+
+✅ SOLUTION - 2 OPTIONS :
+-------------------------
+
+┌─────────────────────────────────────────────────────────────────┐
+│ OPTION 1 : Utiliser votre utilisateur actuel (RECOMMANDÉ)      │
+└─────────────────────────────────────────────────────────────────┘
+
+1. Ouvrez SQL Developer
+2. Connectez-vous avec VOTRE utilisateur actuel
+   (Exemple : username = "votre_nom", password = "votre_mdp")
+3. Ouvrez le fichier :
+   
+   📄 create_database_complete_fixed.sql
+   
+4. Appuyez sur F5 (Run Script)
+5. ✅ Terminé !
+
+┌─────────────────────────────────────────────────────────────────┐
+│ OPTION 2 : Créer l'utilisateur HIBA                            │
+└─────────────────────────────────────────────────────────────────┘
+
+1. Ouvrez SQL Developer
+2. Connectez-vous en tant que DBA (SYSTEM ou SYS as SYSDBA)
+3. Exécutez ces commandes :
+
+   -- Supprimer l'utilisateur s'il existe
+   DROP USER HIBA CASCADE;
+
+   -- Créer l'utilisateur HIBA
+   CREATE USER HIBA IDENTIFIED BY esprit18
+       DEFAULT TABLESPACE USERS
+       TEMPORARY TABLESPACE TEMP
+       QUOTA UNLIMITED ON USERS;
+
+   -- Donner les privilèges
+   GRANT CONNECT, RESOURCE TO HIBA;
+   GRANT CREATE VIEW TO HIBA;
+   GRANT CREATE SEQUENCE TO HIBA;
+   GRANT CREATE TRIGGER TO HIBA;
+   GRANT CREATE TABLE TO HIBA;
+   GRANT UNLIMITED TABLESPACE TO HIBA;
+
+4. Déconnectez-vous
+5. Reconnectez-vous avec :
+   - Utilisateur : HIBA
+   - Mot de passe : esprit18
+
+6. Ouvrez le fichier :
+   
+   📄 create_database_complete_fixed.sql
+   
+7. Appuyez sur F5 (Run Script)
+8. ✅ Terminé !
+
+═══════════════════════════════════════════════════════════════════
+
+📊 CE QUI SERA CRÉÉ :
+---------------------
+✓ 10 tables (GEST_RESIDENT, GEST_VEHICULE, GEST_EMPLOYE, etc.)
+✓ 5 triggers automatiques pour l'historique
+✓ 1 séquence pour auto-incrémentation
+✓ 11 index pour les performances
+✓ Données de test (3 résidents, 2 véhicules, etc.)
+
+═══════════════════════════════════════════════════════════════════
+
+⚠️ ERREURS CORRIGÉES :
+----------------------
+✅ Suppression du préfixe "HIBA." (le script utilise le schéma actuel)
+✅ Correction de la typo "SITUATIONFAMILIALE"
+✅ Raccourcissement des noms de triggers (< 30 caractères)
+✅ Privilèges adaptés
+
+═══════════════════════════════════════════════════════════════════
+
+🔧 APRÈS L'INSTALLATION :
+-------------------------
+
+1. Vérifiez que les tables sont créées :
+   
+   SELECT TABLE_NAME FROM USER_TABLES
+   WHERE TABLE_NAME LIKE 'GEST_%' OR TABLE_NAME LIKE 'HIST%'
+   ORDER BY TABLE_NAME;
+
+2. Vérifiez les données de test :
+   
+   SELECT * FROM GEST_RESIDENT;
+
+3. Modifiez votre fichier connection.cpp pour utiliser le bon utilisateur :
+   
+   db.setUserName("VOTRE_UTILISATEUR");  // ou "HIBA" si option 2
+   db.setPassword("VOTRE_MOT_DE_PASSE"); // ou "esprit18" si option 2
+
+4. Lancez votre application Qt !
+
+═══════════════════════════════════════════════════════════════════
+
+📞 EN CAS DE PROBLÈME :
+-----------------------
+
+Erreur : "table or view does not exist"
+→ Les tables n'ont pas été créées. Relancez le script.
+
+Erreur : "insufficient privileges"
+→ Votre utilisateur n'a pas les droits. Utilisez l'OPTION 2.
+
+Erreur : "identifier is too long"
+→ Corrigé dans create_database_complete_fixed.sql
+
+═══════════════════════════════════════════════════════════════════
+
+🎉 BON COURAGE !

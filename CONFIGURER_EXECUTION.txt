@@ -1,0 +1,46 @@
+===========================================
+GUIDE DE CONFIGURATION POUR L'EXÉCUTION
+===========================================
+
+PROBLÈME: "No executable specified"
+
+SOLUTION ÉTAPE PAR ÉTAPE:
+
+1. OUVREZ LE PROJET DANS QT CREATOR
+   - Fichier → Ouvrir un fichier ou un projet
+   - Sélectionnez: C:\ayooo\projetsmartcity.pro
+
+2. CONFIGUREZ LE KIT QT
+   - Qt Creator va demander de configurer le projet
+   - Sélectionnez: "Desktop Qt 6.7.3 MinGW 64-bit" (ou votre version Qt 6)
+   - Cliquez sur "Configure Project"
+
+3. VÉRIFIEZ LA CONFIGURATION D'EXÉCUTION
+   - Cliquez sur l'icône "Projets" dans la barre latérale gauche (ou Ctrl+5)
+   - Dans la section "Run", vérifiez:
+     * Executable: C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\Atelier_Connexion.exe
+     * Working directory: C:\ayooo
+   
+   Si l'exécutable n'est pas détecté automatiquement:
+   - Cliquez sur le bouton "..." à côté de "Executable"
+   - Naviguez vers: C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\
+   - Sélectionnez: Atelier_Connexion.exe
+   - Cliquez sur "OK"
+
+4. CONSTRUISEZ LE PROJET
+   - Cliquez sur l'icône "Build" (marteau) ou Ctrl+B
+   - Attendez la fin de la compilation
+
+5. EXÉCUTEZ LE PROJET
+   - Cliquez sur l'icône "Run" (flèche verte) ou Ctrl+R
+   - L'application devrait démarrer
+
+CHEMIN DE L'EXÉCUTABLE:
+C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\Atelier_Connexion.exe
+
+RÉPERTOIRE DE TRAVAIL:
+C:\ayooo
+
+
+
+
