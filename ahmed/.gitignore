@@ -1,0 +1,49 @@
+# Qt / Qt Creator
+*.user
+*.pro.user
+*.qbs.user
+*.qbs.user.*
+*.autosave
+*.pro.user.*
+*.qmlproject.user*
+*.creator.*
+*.creator/user*
+*.pro.user.*
+.moc/
+moc_*
+ui_*
+qrc_*.cpp
+*.qrc.depends
+*.qrc
+*.obj
+*.o
+*.dll
+*.exe
+*.a
+*.lib
+*.pdb
+*.pch
+*.ipch
+*.log
+*.cache
+*.tmp
+*.bak
+*.swp
+Makefile*
+.qmake.stash
+
+# CMake / Ninja out-of-source builds
+build*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+CMakeUserPresets.json
+compile_commands.json
+
+# IDEs
+.vs/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

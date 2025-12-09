@@ -2,24 +2,24 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QTableWidget>
-#include <QMessageBox>
-#include <QMap>
-#include <QLineEdit>
-#include <QVector>
-#include <QGraphicsScene>
-#include <QGraphicsView>
-#include <QNetworkAccessManager>
-#include <QSortFilterProxyModel>
+#include <QStringList>
+#include <QList>
 #include <QtCharts/QChartView>
-#include <QtCharts/QPieSeries>
 #include <QtCharts/QChart>
-#include <QDialog>
-#include <QVBoxLayout>
-#include <QDialogButtonBox>
+#include <QtCharts/QPieSeries>
 
-#include "Employee.h"
 #include "resident.h"
+#include "historique.h"
+#include "smsmanager.h"
+#include "smsreceiver.h"
+#include "Employee.h"
+#include "vehicule.h"
+#include "maison.h"
+#include "alerte.h"
+
+class QGraphicsScene;
+class QGraphicsView;
+class QNetworkAccessManager;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -32,9 +32,12 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
-
-    QMap<QString, int> getStatistiquesStatus();
-    QMap<QString, int> getStatistiquesNiveauSecurite();
+    
+    // ✅ Méthode publique pour rafraîchir après connexion DB
+    void rafraichirResidents();
+    
+    // 📱 Test d'envoi SMS
+    void testerEnvoiSms();
 
 private slots:
     void onGestionEmployes();
@@ -44,111 +47,111 @@ private slots:
     void onGestionJardins();
     void onGestionCabinets();
     void onDeconnexion();
-
-    void onAjouterEmploye();
-    void onModifierEmploye();
-    void onSupprimerEmploye();
-    void onChargerEmployes();
-    void onTableSelectionChanged();
-    void onExporterPDF();
-    void onRechercheChanged();
-    void onTriEmailChanged();
-    void onTriSalaireChanged();
-    void onStatistiqueEmploye();
-
-    void onRechercheVehiculeChanged();
-    void onTriTypeChanged();
-    void onTriEtatChanged();
-    void on_ajouter_3_clicked();
-    void on_modifier_3_clicked();
-    void on_supprimer_3_clicked();
-    void on_exporter_3_clicked();
-    void on_btnChatbot_clicked();
-    void on_btnTriDate_clicked();
-    void on_btnBackFromChat_clicked();
-    void on_btnSendChat_clicked();
-    void sendMessageToAzureAI(const QString &message);
-    void on_btnRecom_clicked();
-    void on_btnBackFromRecom_clicked();
-    QString buildMaintenancePromptFromCurrentVehicle() const;
-    void sendRecommendationToAzureAI(const QString &message);
-    QChartView* createVehiculePieChart();
-    void on_pushButton_3_clicked();
-    void onTriBoxChanged(const QString &mode);
-
-    void onAjouterMaison();
-    void onModifierMaison();
-    void onSupprimerMaison();
-    void onExporterMaison();
-    void onTableMaisonSelectionChanged();
-    void refreshTableMaison();
-    void clearMaisonInputs();
-    void loadMaisonToInputs(int id);
-    void onExporterMaisons();
-    void exporterMaisonsPDF();
-    void exporterMaisonsCSV();
-    void onTriMaisonsChanged(int index);
-    void onRechercheMaisonsChanged(const QString &text);
-
     void onAjouterResident();
     void onModifierResident();
     void onSupprimerResident();
-    void onExporterResident();
-
-    void onAjouterJardin();
-    void onModifierJardin();
-    void onSupprimerJardin();
-    void onExporterJardin();
-
+    void onExporterResidentsPdf();
+    void onResidentSelectionChanged();
+    void onRechercherResident();
+    void onTriResident();
+    void onAfficherStatistiques();
+    void afficherStatistiquesCercle();
+    void onAfficherHistorique();
+    void onExporterHistoriquePdf();
+    void onFermerHistorique();
+    void onViderHistorique();
+    void onAjouterReclamation();
+    void onEnvoyerSms();
+    void onSmsRecu(const QString &from, const QString &to, const QString &message, const QDateTime &dateTime);
+    void onAfficherSmsRecus();
+    
+    // Employés
+    void chargerEmployes();
+    void onAjouterEmploye();
+    void onModifierEmploye();
+    void onSupprimerEmploye();
+    void onEmployeSelectionChanged();
+    
+    // Véhicules
+    void chargerVehicules();
+    void onAjouterVehicule();
+    void onModifierVehicule();
+    void onSupprimerVehicule();
+    void onVehiculeSelectionChanged();
+    void on_btnChatbotVehicule_clicked();
+    void on_btnBackFromChatVehicule_clicked();
+    void on_btnSendChatVehicule_clicked();
+    void on_btnRecommandationVehicule_clicked();
+    void on_btnBackFromRecommandationVehicule_clicked();
+    void on_btnTriDateVehicule_clicked();
+    void on_lineEditRechercheVehicule_textChanged(const QString &text);
+    QChartView* createVehiculePieChart();
+    void on_btnStatistiquesVehicule_clicked();
+    
+    // Maisons
+    void chargerMaisons();
+    void onAjouterMaison();
+    void onModifierMaison();
+    void onSupprimerMaison();
+    void onMaisonSelectionChanged();
+    void onAssignerResidentMaison();
+    
+    // Alertes
+    void chargerAlertes();
+    void onGestionAlertes();
     void on_Alertes_clicked();
-    void refreshAlertes();
-    void onAfficherCarte();
+    void on_btnRetourAlertes_clicked();
+    void onAjouterAlerte();
+    void onModifierAlerte();
+    void onSupprimerAlerte();
+    void onAlerteSelectionChanged();
+    void onMarquerAlerteTraitee();
     void onRetourAlertes();
+    void onAfficherCarte();
 
-    void on_statistique_currentIndexChanged(int index);
 
 private:
-    void connectButtons();
-    void connectMaisonButtons();
-    void connectAlerteButtons();
-    void connectJardinUi();
-    void appliquerRechercheEtTri();
-    void loadVehicules();
-    void appliquerRechercheEtTriVehicules();
-    void loadMaisons();
-    void loadResidents();
-    void refreshJardinTable();
-    void loadMapForZone(const QString &zone);
-
     Ui::MainWindow *ui;
-    int m_lastInsertedId = -1;
-    QVector<Employee> m_allEmployees;
-    QLineEdit *m_rechercheLineEdit = nullptr;
-    QString selectedImmat;
-    int selectedMaisonId = -1;
-    int selectedResidentId = -1;
-    int selectedJardinId = -1;
-    QNetworkAccessManager *networkManager;
-    QSortFilterProxyModel *proxyModel;
-    bool triCroissant = true;
-    QString processChatMessage(const QString &msg);
-
-    struct VehiculeData {
-        QString immat;
-        QString marque;
-        QString modele;
-        QString type;
-        QString etat;
-        QString service;
-        QString date_maint;
-    };
-    QVector<VehiculeData> m_allVehicules;
-    QLineEdit *m_rechercheVehiculeLineEdit = nullptr;
-
+    void connectButtons();
+    void setupResidentUi();
+    void chargerToutesLesTables();
+    bool construireResidentDepuisFormulaire(Resident &resident, QStringList &erreurs) const;
+    QDate parseDate(const QString &valeur) const;
+    void reinitialiserFormulaireResident();
+    QString residentSelectionneId() const;
+    void afficherErreursValidation(const QStringList &erreurs);
+    QString construireHtmlResidents() const;
+    void filtrerResidents(const QString &critere, const QString &typeTri);
+    void afficherResidents(const QList<Resident> &residents);
+    void rafraichirHistorique();
+    int calculerAge(const QDate &dateNaissance) const;
+    void reinitialiserFormulaireEmploye();
+    void reinitialiserFormulaireVehicule();
+    void reinitialiserFormulaireMaison();
+    void reinitialiserFormulaireAlerte();
+    void connectAlerteButtons();
+    void refreshAlertes();
+    
+    // Membres
+    QList<Resident> m_residentsComplets;
+    QString m_utilisateurActuel;
+    SmsReceiver *m_smsReceiver;
+    QString selectedImmatVehicule;
+    QNetworkAccessManager *networkManagerVehicule;
+    bool triCroissantVehicule;
+    
+    // Carte et localisation
     QGraphicsScene *sceneCarte;
     QGraphicsView *viewCarte;
     QNetworkAccessManager *net;
+    void loadMapForZone(const QString &zone);
+    
+    // Fonctions pour chatbot et IA véhicules
+    QString getVehiculesDatabaseContext();
+    QString processChatMessageVehicule(const QString &msg);
+    QString buildMaintenancePromptFromCurrentVehicule() const;
+    void sendMessageToAzureAI(const QString &message);
+    void sendRecommendationToAzureAI(const QString &message);
 };
 
 #endif // MAINWINDOW_H
-

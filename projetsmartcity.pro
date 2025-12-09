@@ -4,12 +4,11 @@
 #
 #-------------------------------------------------
 
-QT       += core gui sql printsupport charts multimedia multimediawidgets
+QT       += core gui sql printsupport charts network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-TARGET = Projet smartcity
-
+TARGET = Atelier_Connexion
 TEMPLATE = app
 
 # The following define makes your compiler emit warnings if you use
@@ -24,38 +23,42 @@ DEFINES += QT_DEPRECATED_WARNINGS
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 CONFIG += c++11
-# === Resource files (for your embedded logo) ===
-RESOURCES += \
-    resources.qrc
 
 SOURCES += \
-    alerte.cpp \
         main.cpp \
         mainwindow.cpp \
     connection.cpp \
-    Employee.cpp \
-    InputController.cpp \
-    authetification.cpp \
     resident.cpp \
+    historique.cpp \
+    smsmanager.cpp \
+    smsreceiver.cpp \
+    Employee.cpp \
     vehicule.cpp \
-    maison.cpp
+    authentification.cpp \
+    maison.cpp \
+    alerte.cpp
 
 HEADERS += \
-    alerte.h \
         mainwindow.h \
     connection.h \
-    Employee.h \
-    InputController.h \
-    authetification.h \
     resident.h \
+    historique.h \
+    smsmanager.h \
+    smsreceiver.h \
+    Employee.h \
     vehicule.h \
-    maison.h
-
+    authentification.h \
+    maison.h \
+    alerte.h
 FORMS += \
         mainwindow.ui \
-        authentification.ui
+    authentification.ui
+        mainwindow.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+RESOURCES += \
+    resources.qrc

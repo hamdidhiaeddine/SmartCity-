@@ -59,6 +59,8 @@ public:
     static bool validateType(const QString &type, QString &error);
     static bool validateNbrPieces(int nbrPieces, QString &error);
     static bool idExists(int id);
+    static QStringList getResidentsParMaison(int idMaison);
+    static bool assignerResidentAMaison(const QString &idResident, int idMaison);
 
 private:
     int id;
