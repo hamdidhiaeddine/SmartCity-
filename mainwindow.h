@@ -4,6 +4,9 @@
 #include <QMainWindow>
 #include <QStringList>
 #include <QList>
+#include <QtCharts/QChartView>
+#include <QtCharts/QChart>
+#include <QtCharts/QPieSeries>
 
 #include "resident.h"
 #include "historique.h"
@@ -12,6 +15,20 @@
 #include "Employee.h"
 #include "vehicule.h"
 #include "maison.h"
+#include "jardin.h"
+#include "cabinet.h"
+#include "cabinetdialog.h"
+#include "maintenancedialog.h"
+#include "recommandationdialog.h"
+#include "alerte.h"
+#include "facialrecognition.h"
+#include "facecapturedialog.h"
+#include "arduinorfid.h"
+#include "temperaturesensor.h"
+
+class QGraphicsScene;
+class QGraphicsView;
+class QNetworkAccessManager;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -63,6 +80,7 @@ private slots:
     void onModifierEmploye();
     void onSupprimerEmploye();
     void onEmployeSelectionChanged();
+    void onCapturerVisage();
     
     // Véhicules
     void chargerVehicules();
@@ -70,6 +88,16 @@ private slots:
     void onModifierVehicule();
     void onSupprimerVehicule();
     void onVehiculeSelectionChanged();
+    void on_btnChatbotVehicule_clicked();
+    void on_btnBackFromChatVehicule_clicked();
+    void on_btnSendChatVehicule_clicked();
+    void on_btnRecommandationVehicule_clicked();
+    void on_btnBackFromRecommandationVehicule_clicked();
+    void on_btnTriDateVehicule_clicked();
+    void on_lineEditRechercheVehicule_textChanged(const QString &text);
+    QChartView* createVehiculePieChart();
+    void on_btnStatistiquesVehicule_clicked();
+    void on_btnRechercherMatriculeLCD_clicked();  // Nouveau: recherche et envoi au LCD
     
     // Maisons
     void chargerMaisons();
@@ -77,11 +105,66 @@ private slots:
     void onModifierMaison();
     void onSupprimerMaison();
     void onMaisonSelectionChanged();
+    void onAssignerResidentMaison();
+    
+    // Jardins
+    void chargerJardins();
+    void onAjouterJardin();
+    void onModifierJardin();
+    void onSupprimerJardin();
+    void onJardinSelectionChanged();
+    void onExporterJardinsPdf();
+    void onTrierJardinsParType();
+    void onTrierJardinsParId();
+    void onTrierJardinsParSuperficie();
+    void onRechercherJardin();
+    
+    // Maintenance et Recommandations Jardins
+    void onOuvrirMaintenanceDialog();
+    void onOuvrirRecommandationDialog();
+    
+    // Cabinets
+    void chargerCabinets();
+    void onAjouterCabinet();
+    void onModifierCabinet();
+    void onSupprimerCabinet();
+    void onExporterCabinetsPdf();
+    void onCabinetSelectionChanged();
+    void onOuvrirCabinetAvance();
+    
+    // Arduino RFID
+    void onRFIDScanned(const QString &rfidCode);
+    
+    // Capteur Température DHT11
+    void onTemperatureRecue(float temperature, float humidite);
+    void onAlerteArrosage(const QStringList &jardinsAArroser);
+    void onConnecterCapteurTemperature();
+    void onDeconnecterCapteurTemperature();
+    
+    // Contrôle Servo-moteur
+    void on_btnOuvrirServo_clicked();
+    void on_btnFermerServo_clicked();
+    void on_btnTestServo_clicked();
+    
+    // Alertes
+    void chargerAlertes();
+    void onGestionAlertes();
+    void on_Alertes_clicked();
+    void on_btnRetourAlertes_clicked();
+    void onAjouterAlerte();
+    void onModifierAlerte();
+    void onSupprimerAlerte();
+    void onAlerteSelectionChanged();
+    void onMarquerAlerteTraitee();
+    void onRetourAlertes();
+    void onAfficherCarte();
+
 
 private:
     Ui::MainWindow *ui;
     void connectButtons();
     void setupResidentUi();
+    void chargerToutesLesTables();
     bool construireResidentDepuisFormulaire(Resident &resident, QStringList &erreurs) const;
     QDate parseDate(const QString &valeur) const;
     void reinitialiserFormulaireResident();
@@ -95,11 +178,38 @@ private:
     void reinitialiserFormulaireEmploye();
     void reinitialiserFormulaireVehicule();
     void reinitialiserFormulaireMaison();
+    void reinitialiserFormulaireJardin();
+    void reinitialiserFormulaireCabinet();
+    void reinitialiserFormulaireAlerte();
+    void connectAlerteButtons();
+    void refreshAlertes();
+    QString construireHtmlJardins() const;
+    QString construireHtmlCabinets() const;
+    void envoyerVehiculeAuLCD(const QString &immat, const QString &marque, const QString &modele, const QString &type);
     
     // Membres
     QList<Resident> m_residentsComplets;
     QString m_utilisateurActuel;
     SmsReceiver *m_smsReceiver;
+    QString selectedImmatVehicule;
+    QNetworkAccessManager *networkManagerVehicule;
+    bool triCroissantVehicule;
+    QVector<Employee> employesCache;  // Cache des employés pour accéder au password
+    ArduinoRFID *arduinoRFID;  // Gestionnaire Arduino RFID
+    TemperatureSensor *m_temperatureSensor;  // Capteur DHT11 température/humidité
+    
+    // Carte et localisation
+    QGraphicsScene *sceneCarte;
+    QGraphicsView *viewCarte;
+    QNetworkAccessManager *net;
+    void loadMapForZone(const QString &zone);
+    
+    // Fonctions pour chatbot et IA véhicules
+    QString getVehiculesDatabaseContext();
+    QString processChatMessageVehicule(const QString &msg);
+    QString buildMaintenancePromptFromCurrentVehicule() const;
+    void sendMessageToAzureAI(const QString &message);
+    void sendRecommendationToAzureAI(const QString &message);
 };
 
 #endif // MAINWINDOW_H

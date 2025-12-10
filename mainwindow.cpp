@@ -34,6 +34,19 @@
 #include <QMap>
 #include <QPainter>
 #include <QInputDialog>
+#include <QSqlQuery>
+#include <QSqlDatabase>
+#include <QSqlError>
+#include <QGraphicsView>
+#include <QGraphicsScene>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QUrlQuery>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QtMath>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -49,10 +62,27 @@ MainWindow::MainWindow(QWidget *parent)
 
     setupResidentUi();
     connectButtons();
+    connectAlerteButtons();
     m_utilisateurActuel = "Responsable";
     
-    // ⚠️ NE PAS rafraîchir avant que la connexion DB soit établie
-    // rafraichirResidents() sera appelé après la connexion dans Connection::createConnection()
+    // Initialiser la carte et la localisation
+    sceneCarte = new QGraphicsScene(this);
+    viewCarte = nullptr; // Sera initialisé si un widget frame_2 existe dans l'UI
+    if (ui->frame_2) {
+        viewCarte = new QGraphicsView(ui->frame_2);
+        viewCarte->setGeometry(ui->frame_2->rect());
+        viewCarte->setScene(sceneCarte);
+        viewCarte->hide();
+    }
+    net = new QNetworkAccessManager(this);
+    
+    // Initialiser le network manager pour les véhicules (chatbot + IA)
+    networkManagerVehicule = new QNetworkAccessManager(this);
+    selectedImmatVehicule = "";
+    triCroissantVehicule = true;
+    
+    // Charger toutes les tables au démarrage
+    chargerToutesLesTables();
     
     // Initialiser le récepteur SMS
     m_smsReceiver = new SmsReceiver(this);
@@ -67,10 +97,137 @@ MainWindow::MainWindow(QWidget *parent)
     } else {
         qWarning() << "Impossible de démarrer le récepteur SMS";
     }
+    
+    // Initialiser Arduino RFID
+    arduinoRFID = new ArduinoRFID(this);
+    connect(arduinoRFID, &ArduinoRFID::rfidScanned, this, &MainWindow::onRFIDScanned);
+    connect(arduinoRFID, &ArduinoRFID::errorOccurred, this, [](const QString &error) {
+        qWarning() << "Erreur Arduino:" << error;
+    });
+    
+    // Vérifier la disponibilité des ports série
+    qDebug() << "========================================";
+    qDebug() << "🔌 INITIALISATION ARDUINO RFID";
+    qDebug() << "========================================";
+    QStringList ports = ArduinoRFID::getAvailablePorts();
+    if (ports.isEmpty()) {
+        qWarning() << "⚠️ Aucun port série détecté sur ce système";
+    } else {
+        qDebug() << "✓ Ports série disponibles:" << ports.size();
+        for (const QString &port : ports) {
+            qDebug() << "  -" << port;
+        }
+        
+        // Connexion automatique de l'Arduino RFID au démarrage
+        qDebug() << "";
+        qDebug() << "🔄 Tentative de connexion automatique Arduino RFID...";
+        
+        bool arduinoConnecte = false;
+        
+        // Prioriser les ports Arduino
+        for (const QString &port : ports) {
+            if (port.contains("Arduino", Qt::CaseInsensitive)) {
+                qDebug() << "   Essai prioritaire sur" << port << "...";
+                if (arduinoRFID->connectArduino(port)) {
+                    qDebug() << "✅ Arduino RFID connecté automatiquement sur" << port;
+                    arduinoConnecte = true;
+                    break;
+                }
+            }
+        }
+        
+        // Si pas d'Arduino trouvé, essayer les autres ports
+        if (!arduinoConnecte) {
+            for (const QString &port : ports) {
+                if (!port.contains("Bluetooth", Qt::CaseInsensitive)) {
+                    qDebug() << "   Essai sur" << port << "...";
+                    if (arduinoRFID->connectArduino(port)) {
+                        qDebug() << "✅ Arduino RFID connecté automatiquement sur" << port;
+                        arduinoConnecte = true;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (!arduinoConnecte) {
+            qWarning() << "⚠️ Arduino RFID non connecté automatiquement";
+            qWarning() << "💡 Vous pouvez réessayer manuellement depuis 'Gestion Maisons'";
+        }
+    }
+    qDebug() << "========================================";
+    
+    // ⚠️ IMPORTANT: Le capteur DHT11 et l'Arduino RFID ne peuvent pas partager le même port série
+    // Option 1: Utiliser 2 Arduino différents sur 2 ports différents
+    // Option 2: Désactiver l'un des deux systèmes
+    // Pour l'instant, on désactive le capteur température si RFID est connecté
+    
+    // Initialiser le capteur de température DHT11
+    m_temperatureSensor = new TemperatureSensor(this);
+    connect(m_temperatureSensor, &TemperatureSensor::temperatureRecue, this, &MainWindow::onTemperatureRecue);
+    connect(m_temperatureSensor, &TemperatureSensor::alerteArrosage, this, &MainWindow::onAlerteArrosage);
+    connect(m_temperatureSensor, &TemperatureSensor::erreurConnexion, this, [](const QString &error) {
+        qWarning() << "Erreur capteur température:" << error;
+    });
+    
+    qDebug() << "";
+    qDebug() << "========================================";
+    qDebug() << "🌡️ INITIALISATION CAPTEUR DHT11";
+    qDebug() << "========================================";
+    
+    // Connexion automatique du capteur température au démarrage
+    bool capteurConnecte = false;
+    
+    // Prioriser COM9 (port habituel du DHT11)
+    QString portPrioritaire = "COM9";
+    if (ports.contains(portPrioritaire)) {
+        qDebug() << "🔄 Tentative de connexion prioritaire sur" << portPrioritaire << "...";
+        if (m_temperatureSensor->connecter(portPrioritaire)) {
+            qDebug() << "✅ Capteur DHT11 connecté automatiquement sur" << portPrioritaire;
+            capteurConnecte = true;
+            
+            // Mettre à jour le bouton pour indiquer que le capteur est connecté
+            ui->btnConnecterCapteur->setText("✅ Capteur Connecté");
+            ui->btnConnecterCapteur->setStyleSheet(
+                "QPushButton { background-color: #28a745; color: white; border-radius: 5px; font: bold 10pt \"Arial\"; }"
+                "QPushButton:hover { background-color: #218838; }"
+            );
+        }
+    }
+    
+    // Si COM9 n'a pas marché, essayer les autres ports (sauf Bluetooth)
+    if (!capteurConnecte) {
+        for (const QString &port : ports) {
+            if (port == portPrioritaire) continue; // Déjà testé
+            if (port.contains("Bluetooth", Qt::CaseInsensitive)) continue; // Éviter Bluetooth
+            
+            qDebug() << "🔄 Test de connexion sur" << port << "...";
+            if (m_temperatureSensor->connecter(port)) {
+                qDebug() << "✅ Capteur DHT11 connecté automatiquement sur" << port;
+                capteurConnecte = true;
+                
+                // Mettre à jour le bouton pour indiquer que le capteur est connecté
+                ui->btnConnecterCapteur->setText("✅ Capteur Connecté");
+                ui->btnConnecterCapteur->setStyleSheet(
+                    "QPushButton { background-color: #28a745; color: white; border-radius: 5px; font: bold 10pt \"Arial\"; }"
+                    "QPushButton:hover { background-color: #218838; }"
+                );
+                break;
+            }
+        }
+    }
+    
+    if (!capteurConnecte) {
+        qWarning() << "⚠️ Capteur DHT11 non connecté - vérifiez le câblage et le port";
+        qWarning() << "⚠️ Vous pouvez cliquer sur le bouton '🔌 Connecter Capteur' pour le connecter manuellement";
+    }
+    qDebug() << "========================================";
 }
 
 MainWindow::~MainWindow()
 {
+    delete sceneCarte;
+    delete viewCarte;
     delete ui;
 }
 void MainWindow::connectButtons()
@@ -139,6 +296,9 @@ void MainWindow::connectButtons()
     if (ui->tableau) {
         connect(ui->tableau, &QTableWidget::itemSelectionChanged, this, &MainWindow::onEmployeSelectionChanged);
     }
+    if (ui->capturerVisageBtn) {
+        connect(ui->capturerVisageBtn, &QPushButton::clicked, this, &MainWindow::onCapturerVisage);
+    }
     
     // Véhicules
     if (ui->ajouter_3) {
@@ -167,6 +327,68 @@ void MainWindow::connectButtons()
     if (ui->tableau_7) {
         connect(ui->tableau_7, &QTableWidget::itemSelectionChanged, this, &MainWindow::onMaisonSelectionChanged);
     }
+    if (ui->btnAssignerResident) {
+        connect(ui->btnAssignerResident, &QPushButton::clicked, this, &MainWindow::onAssignerResidentMaison);
+    }
+    
+    // Jardins
+    if (ui->ajouter_8) {
+        connect(ui->ajouter_8, &QPushButton::clicked, this, &MainWindow::onAjouterJardin);
+    }
+    if (ui->modifier_8) {
+        connect(ui->modifier_8, &QPushButton::clicked, this, &MainWindow::onModifierJardin);
+    }
+    if (ui->supprimer_7) {
+        connect(ui->supprimer_7, &QPushButton::clicked, this, &MainWindow::onSupprimerJardin);
+    }
+    if (ui->exporter_8) {
+        connect(ui->exporter_8, &QPushButton::clicked, this, &MainWindow::onExporterJardinsPdf);
+    }
+    if (ui->tableau_8) {
+        connect(ui->tableau_8, &QTableWidget::itemSelectionChanged, this, &MainWindow::onJardinSelectionChanged);
+    }
+    if (ui->tripartype) {
+        connect(ui->tripartype, &QPushButton::clicked, this, &MainWindow::onTrierJardinsParType);
+    }
+    if (ui->triparid) {
+        connect(ui->triparid, &QPushButton::clicked, this, &MainWindow::onTrierJardinsParId);
+    }
+    if (ui->triparsuperficie) {
+        connect(ui->triparsuperficie, &QPushButton::clicked, this, &MainWindow::onTrierJardinsParSuperficie);
+    }
+    if (ui->recherchebtn) {
+        connect(ui->recherchebtn, &QPushButton::clicked, this, &MainWindow::onRechercherJardin);
+    }
+    
+    // Maintenance et Recommandations Jardins
+    if (ui->maintenance) {
+        connect(ui->maintenance, &QPushButton::clicked, this, &MainWindow::onOuvrirMaintenanceDialog);
+    }
+    if (ui->Recommendation) {
+        connect(ui->Recommendation, &QPushButton::clicked, this, &MainWindow::onOuvrirRecommandationDialog);
+    }
+    
+    // Bouton connecter capteur de température
+    if (ui->btnConnecterCapteur) {
+        connect(ui->btnConnecterCapteur, &QPushButton::clicked, this, &MainWindow::onConnecterCapteurTemperature);
+    }
+    
+    // Cabinets
+    if (ui->ajouter_9) {
+        connect(ui->ajouter_9, &QPushButton::clicked, this, &MainWindow::onAjouterCabinet);
+    }
+    if (ui->modifier_9) {
+        connect(ui->modifier_9, &QPushButton::clicked, this, &MainWindow::onModifierCabinet);
+    }
+    if (ui->supprimer_8) {
+        connect(ui->supprimer_8, &QPushButton::clicked, this, &MainWindow::onSupprimerCabinet);
+    }
+    if (ui->exporter_9) {
+        connect(ui->exporter_9, &QPushButton::clicked, this, &MainWindow::onExporterCabinetsPdf);
+    }
+    if (ui->tableau_12) {
+        connect(ui->tableau_12, &QTableWidget::itemSelectionChanged, this, &MainWindow::onCabinetSelectionChanged);
+    }
 }
 void MainWindow::onGestionEmployes()
 {
@@ -194,11 +416,13 @@ void MainWindow::onGestionMaisons()
 void MainWindow::onGestionJardins()
 {
     ui->stackedWidget->setCurrentWidget(ui->pageJardins);
+    chargerJardins();
 }
 
 void MainWindow::onGestionCabinets()
 {
     ui->stackedWidget->setCurrentWidget(ui->pageCabinets);
+    chargerCabinets();
 }
 
 void MainWindow::onDeconnexion()
@@ -216,6 +440,34 @@ void MainWindow::setupResidentUi()
     ui->tableau_5->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableau_5->setEditTriggers(QAbstractItemView::NoEditTriggers);
     ui->tableau_5->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+}
+
+void MainWindow::chargerToutesLesTables()
+{
+    qDebug() << "=== 📊 Chargement de toutes les tables au démarrage ===";
+    
+    // Charger les résidents
+    rafraichirResidents();
+    
+    // Charger les employés
+    chargerEmployes();
+    
+    // Charger les véhicules
+    chargerVehicules();
+    
+    // Charger les maisons
+    chargerMaisons();
+    
+    // Charger les jardins
+    chargerJardins();
+    
+    // Charger les cabinets
+    chargerCabinets();
+    
+    // Charger les alertes
+    chargerAlertes();
+    
+    qDebug() << "=== ✅ Toutes les tables ont été chargées ===";
 }
 
 void MainWindow::rafraichirResidents()
@@ -1156,7 +1408,7 @@ void MainWindow::chargerEmployes()
     }
     
     QString errorText;
-    QVector<Employee> employes = Employee::fetchAll(errorText);
+    employesCache = Employee::fetchAll(errorText);
     
     if (!errorText.isEmpty()) {
         QMessageBox::warning(this, "Erreur", "Impossible de charger les employés:\n" + errorText);
@@ -1164,10 +1416,10 @@ void MainWindow::chargerEmployes()
     }
     
     ui->tableau->clearContents();
-    ui->tableau->setRowCount(employes.size());
+    ui->tableau->setRowCount(employesCache.size());
     
-    for (int i = 0; i < employes.size(); ++i) {
-        const Employee &emp = employes[i];
+    for (int i = 0; i < employesCache.size(); ++i) {
+        const Employee &emp = employesCache[i];
         ui->tableau->setItem(i, 0, new QTableWidgetItem(QString::number(emp.idEmploye)));
         ui->tableau->setItem(i, 1, new QTableWidgetItem(emp.nom));
         ui->tableau->setItem(i, 2, new QTableWidgetItem(emp.prenom));
@@ -1178,7 +1430,7 @@ void MainWindow::chargerEmployes()
         ui->tableau->setItem(i, 7, new QTableWidgetItem(QString::number(emp.telephone)));
     }
     
-    qDebug() << "✓" << employes.size() << "employés chargés";
+    qDebug() << "✓" << employesCache.size() << "employés chargés";
 }
 
 void MainWindow::onAjouterEmploye()
@@ -1197,6 +1449,7 @@ void MainWindow::onAjouterEmploye()
     emp.salaire = ui->salaireline->text().toDouble();
     emp.adresse = ui->adresseline->text().trimmed();
     emp.telephone = ui->telephoneline->text().toLongLong();
+    emp.password = ui->passwordline ? ui->passwordline->text().trimmed() : "password123";
     
     // Validation
     if (emp.nom.isEmpty() || emp.prenom.isEmpty()) {
@@ -1238,6 +1491,7 @@ void MainWindow::onModifierEmploye()
     emp.salaire = ui->salaireline->text().toDouble();
     emp.adresse = ui->adresseline->text().trimmed();
     emp.telephone = ui->telephoneline->text().toLongLong();
+    emp.password = ui->passwordline ? ui->passwordline->text().trimmed() : "password123";
     
     QString errorText;
     if (emp.updateById(id, errorText)) {
@@ -1290,18 +1544,22 @@ void MainWindow::onEmployeSelectionChanged()
     }
     
     int row = ui->tableau->currentRow();
-    if (row < 0) {
+    if (row < 0 || row >= employesCache.size()) {
         return;
     }
     
+    // Récupérer l'employé depuis le cache
+    const Employee &emp = employesCache[row];
+    
     // Remplir le formulaire avec les données sélectionnées
-    if (ui->nomline) ui->nomline->setText(ui->tableau->item(row, 1)->text());
-    if (ui->prenomline) ui->prenomline->setText(ui->tableau->item(row, 2)->text());
-    if (ui->emailline) ui->emailline->setText(ui->tableau->item(row, 3)->text());
-    if (ui->posteline) ui->posteline->setText(ui->tableau->item(row, 4)->text());
-    if (ui->salaireline) ui->salaireline->setText(ui->tableau->item(row, 5)->text());
-    if (ui->adresseline) ui->adresseline->setText(ui->tableau->item(row, 6)->text());
-    if (ui->telephoneline) ui->telephoneline->setText(ui->tableau->item(row, 7)->text());
+    if (ui->nomline) ui->nomline->setText(emp.nom);
+    if (ui->prenomline) ui->prenomline->setText(emp.prenom);
+    if (ui->emailline) ui->emailline->setText(emp.email);
+    if (ui->posteline) ui->posteline->setText(emp.poste);
+    if (ui->salaireline) ui->salaireline->setText(QString::number(emp.salaire));
+    if (ui->adresseline) ui->adresseline->setText(emp.adresse);
+    if (ui->telephoneline) ui->telephoneline->setText(QString::number(emp.telephone));
+    if (ui->passwordline) ui->passwordline->setText(emp.password);
 }
 
 void MainWindow::reinitialiserFormulaireEmploye()
@@ -1313,7 +1571,38 @@ void MainWindow::reinitialiserFormulaireEmploye()
     if (ui->salaireline) ui->salaireline->clear();
     if (ui->adresseline) ui->adresseline->clear();
     if (ui->telephoneline) ui->telephoneline->clear();
+    if (ui->passwordline) ui->passwordline->clear();
 }
+
+void MainWindow::onCapturerVisage()
+{
+    // Vérifier qu'un employé est sélectionné
+    if (ui->tableau && ui->tableau->currentRow() >= 0) {
+        int row = ui->tableau->currentRow();
+        int employeId = ui->tableau->item(row, 0)->text().toInt();
+        
+        // Ouvrir le dialogue de capture
+        FaceCaptureDialog dialog(this);
+        if (dialog.exec() == QDialog::Accepted) {
+            QImage capturedImage = dialog.getCapturedImage();
+            
+            if (!capturedImage.isNull()) {
+                QString errorText;
+                if (FacialRecognition::saveFaceImage(employeId, capturedImage, errorText)) {
+                    QMessageBox::information(this, "Succès", 
+                        "La photo de visage a été enregistrée avec succès!");
+                } else {
+                    QMessageBox::warning(this, "Erreur", 
+                        "Erreur lors de l'enregistrement de la photo:\n" + errorText);
+                }
+            }
+        }
+    } else {
+        QMessageBox::warning(this, "Attention", 
+            "Veuillez sélectionner un employé dans le tableau.");
+    }
+}
+
 
 // ============================================================
 // GESTION DES VÉHICULES
@@ -1335,14 +1624,13 @@ void MainWindow::chargerVehicules()
     int row = 0;
     while (query.next()) {
         ui->tableau_3->insertRow(row);
-        ui->tableau_3->setItem(row, 0, new QTableWidgetItem(query.value("ID_VEHI").toString()));
-        ui->tableau_3->setItem(row, 1, new QTableWidgetItem(query.value("IMMAT").toString()));
-        ui->tableau_3->setItem(row, 2, new QTableWidgetItem(query.value("MARQUE").toString()));
-        ui->tableau_3->setItem(row, 3, new QTableWidgetItem(query.value("MODELE").toString()));
-        ui->tableau_3->setItem(row, 4, new QTableWidgetItem(query.value("TYPE").toString()));
-        ui->tableau_3->setItem(row, 5, new QTableWidgetItem(query.value("ETAT").toString()));
-        ui->tableau_3->setItem(row, 6, new QTableWidgetItem(query.value("SERVICE").toString()));
-        ui->tableau_3->setItem(row, 7, new QTableWidgetItem(query.value("DATE_MAINT").toString()));
+        ui->tableau_3->setItem(row, 0, new QTableWidgetItem(query.value("IMMATRICULATION").toString()));
+        ui->tableau_3->setItem(row, 1, new QTableWidgetItem(query.value("MARQUE").toString()));
+        ui->tableau_3->setItem(row, 2, new QTableWidgetItem(query.value("MODELE").toString()));
+        ui->tableau_3->setItem(row, 3, new QTableWidgetItem(query.value("TYPE").toString()));
+        ui->tableau_3->setItem(row, 4, new QTableWidgetItem(query.value("ETAT").toString()));
+        ui->tableau_3->setItem(row, 5, new QTableWidgetItem(query.value("SERVICE").toString()));
+        ui->tableau_3->setItem(row, 6, new QTableWidgetItem(query.value("DATE_MAINTENANCE").toString()));
         ++row;
     }
     
@@ -1351,8 +1639,8 @@ void MainWindow::chargerVehicules()
 
 void MainWindow::onAjouterVehicule()
 {
-    if (!ui->immatline_2 || !ui->marqueline_2 || !ui->modeleline_2 || !ui->Typeline_2 || !ui->Etatline_2
-        || !ui->service_2 || !ui->datemaintline_2) {
+    if (!ui->immatline_2 || !ui->marqueline_2 || !ui->modeleline_2 || !ui->triemail_2 || !ui->Etatline_2
+        || !ui->serviceline_2 || !ui->datemaintline_2) {
         QMessageBox::warning(this, "Erreur", "Les champs du formulaire véhicule sont introuvables !");
         return;
     }
@@ -1360,9 +1648,9 @@ void MainWindow::onAjouterVehicule()
     QString immat = ui->immatline_2->text().trimmed();
     QString marque = ui->marqueline_2->text().trimmed();
     QString modele = ui->modeleline_2->text().trimmed();
-    QString type = ui->Typeline_2->text().trimmed();
-    QString etat = ui->Etatline_2->text().trimmed();
-    QString service = ui->service_2->text().trimmed();
+    QString type = ui->Typeline_2 ? ui->Typeline_2->text().trimmed() : (ui->triemail_2 ? ui->triemail_2->currentText().trimmed() : "");
+    QString etat = ui->Etatline_2->currentText().trimmed();
+    QString service = ui->serviceline_2->text().trimmed();
     
     // Parse date
     QString dateStr = ui->datemaintline_2->text().trimmed();
@@ -1403,14 +1691,14 @@ void MainWindow::onModifierVehicule()
         return;
     }
     
-    QString oldImmat = ui->tableau_3->item(row, 1)->text();
+    QString oldImmat = ui->tableau_3->item(row, 0)->text();
     
     QString immat = ui->immatline_2->text().trimmed();
     QString marque = ui->marqueline_2->text().trimmed();
     QString modele = ui->modeleline_2->text().trimmed();
-    QString type = ui->Typeline_2->text().trimmed();
-    QString etat = ui->Etatline_2->text().trimmed();
-    QString service = ui->service_2->text().trimmed();
+    QString type = ui->Typeline_2 ? ui->Typeline_2->text().trimmed() : (ui->triemail_2 ? ui->triemail_2->currentText().trimmed() : "");
+    QString etat = ui->Etatline_2->currentText().trimmed();
+    QString service = ui->serviceline_2->text().trimmed();
     
     QString dateStr = ui->datemaintline_2->text().trimmed();
     QDate dateMaint = QDate::fromString(dateStr, "dd/MM/yyyy");
@@ -1444,9 +1732,9 @@ void MainWindow::onSupprimerVehicule()
         return;
     }
     
-    QString immat = ui->tableau_3->item(row, 1)->text();
-    QString marque = ui->tableau_3->item(row, 2)->text();
-    QString modele = ui->tableau_3->item(row, 3)->text();
+    QString immat = ui->tableau_3->item(row, 0)->text();
+    QString marque = ui->tableau_3->item(row, 1)->text();
+    QString modele = ui->tableau_3->item(row, 2)->text();
     
     auto reponse = QMessageBox::question(this, "Confirmation",
                                           "Supprimer le véhicule " + immat + " (" + marque + " " + modele + ") ?",
@@ -1474,17 +1762,23 @@ void MainWindow::onVehiculeSelectionChanged()
     
     int row = ui->tableau_3->currentRow();
     if (row < 0) {
+        selectedImmatVehicule = "";
         return;
     }
     
+    // Sauvegarder l'immatriculation sélectionnée pour les recommandations
+    selectedImmatVehicule = ui->tableau_3->item(row, 0)->text();
+    qDebug() << "✅ Véhicule sélectionné:" << selectedImmatVehicule;
+    
     // Remplir le formulaire avec les données sélectionnées
-    if (ui->immatline_2) ui->immatline_2->setText(ui->tableau_3->item(row, 1)->text());
-    if (ui->marqueline_2) ui->marqueline_2->setText(ui->tableau_3->item(row, 2)->text());
-    if (ui->modeleline_2) ui->modeleline_2->setText(ui->tableau_3->item(row, 3)->text());
-    if (ui->Typeline_2) ui->Typeline_2->setText(ui->tableau_3->item(row, 4)->text());
-    if (ui->Etatline_2) ui->Etatline_2->setText(ui->tableau_3->item(row, 5)->text());
-    if (ui->service_2) ui->service_2->setText(ui->tableau_3->item(row, 6)->text());
-    if (ui->datemaintline_2) ui->datemaintline_2->setText(ui->tableau_3->item(row, 7)->text());
+    if (ui->immatline_2) ui->immatline_2->setText(ui->tableau_3->item(row, 0)->text());
+    if (ui->marqueline_2) ui->marqueline_2->setText(ui->tableau_3->item(row, 1)->text());
+    if (ui->modeleline_2) ui->modeleline_2->setText(ui->tableau_3->item(row, 2)->text());
+    if (ui->Typeline_2) ui->Typeline_2->setText(ui->tableau_3->item(row, 3)->text());
+    if (ui->triemail_2) ui->triemail_2->setCurrentText(ui->tableau_3->item(row, 3)->text());
+    if (ui->Etatline_2) ui->Etatline_2->setCurrentText(ui->tableau_3->item(row, 4)->text());
+    if (ui->serviceline_2) ui->serviceline_2->setText(ui->tableau_3->item(row, 5)->text());
+    if (ui->datemaintline_2) ui->datemaintline_2->setText(ui->tableau_3->item(row, 6)->text());
 }
 
 void MainWindow::reinitialiserFormulaireVehicule()
@@ -1493,9 +1787,74 @@ void MainWindow::reinitialiserFormulaireVehicule()
     if (ui->marqueline_2) ui->marqueline_2->clear();
     if (ui->modeleline_2) ui->modeleline_2->clear();
     if (ui->Typeline_2) ui->Typeline_2->clear();
-    if (ui->Etatline_2) ui->Etatline_2->clear();
-    if (ui->service_2) ui->service_2->clear();
+    if (ui->triemail_2) ui->triemail_2->setCurrentIndex(-1);
+    if (ui->Etatline_2) ui->Etatline_2->setCurrentIndex(-1);
+    if (ui->serviceline_2) ui->serviceline_2->clear();
     if (ui->datemaintline_2) ui->datemaintline_2->clear();
+}
+
+// Envoyer les informations du véhicule au LCD Arduino
+void MainWindow::envoyerVehiculeAuLCD(const QString &immat, const QString &marque, const QString &modele, const QString &type)
+{
+    Q_UNUSED(type);
+    if (!arduinoRFID || !arduinoRFID->isConnected()) {
+        QMessageBox::warning(this, "Arduino", "Arduino non connecté !");
+        return;
+    }
+    
+    // Format: LCD|ligne1|ligne2
+    // Ligne 1: Matricule
+    // Ligne 2: Marque Modele
+    QString ligne1 = QString("Mat:%1").arg(immat);
+    QString ligne2 = QString("%1 %2").arg(marque, modele);
+    
+    // Limiter à 16 caractères par ligne pour LCD 16x2
+    if (ligne1.length() > 16) ligne1 = ligne1.left(16);
+    if (ligne2.length() > 16) ligne2 = ligne2.left(16);
+    
+    QString commande = QString("LCD|%1|%2\n").arg(ligne1, ligne2);
+    
+    qDebug() << "📟 Envoi au LCD:" << commande;
+    arduinoRFID->getSerialPort()->write(commande.toUtf8());
+    arduinoRFID->getSerialPort()->flush();
+    
+    QMessageBox::information(this, "LCD Arduino", 
+        QString("Informations envoyées au LCD:\n\n%1\n%2").arg(ligne1, ligne2));
+}
+
+// Bouton: Rechercher matricule et envoyer au LCD
+void MainWindow::on_btnRechercherMatriculeLCD_clicked()
+{
+    QString immatRecherche = ui->lineEditMatriculeLCD->text().trimmed().toUpper();
+    
+    if (immatRecherche.isEmpty()) {
+        QMessageBox::warning(this, "Recherche", "Veuillez entrer une matricule !");
+        return;
+    }
+    
+    // Rechercher le véhicule dans la base de données
+    QSqlQuery query;
+    query.prepare("SELECT IMMATRICULATION, MARQUE, MODELE, TYPE FROM GEST_VEHICULE WHERE UPPER(IMMATRICULATION) = :immat");
+    query.bindValue(":immat", immatRecherche);
+    
+    if (!query.exec()) {
+        QMessageBox::critical(this, "Erreur", "Erreur de recherche:\n" + query.lastError().text());
+        return;
+    }
+    
+    if (query.next()) {
+        // Véhicule trouvé
+        QString immat = query.value(0).toString();
+        QString marque = query.value(1).toString();
+        QString modele = query.value(2).toString();
+        QString type = query.value(3).toString();
+        
+        // Envoyer au LCD
+        envoyerVehiculeAuLCD(immat, marque, modele, type);
+    } else {
+        QMessageBox::warning(this, "Véhicule introuvable", 
+            QString("Aucun véhicule avec la matricule: %1").arg(immatRecherche));
+    }
 }
 
 // ============================================================
@@ -1562,6 +1921,15 @@ void MainWindow::onAjouterMaison()
     QString errorText;
     if (m.ajouter(id, &errorText)) {
         QMessageBox::information(this, "Succès", "Maison ajoutée avec succès !");
+        
+        // Créer une alerte automatiquement si le niveau de sécurité est faible (< 3)
+        if (securite < 3) {
+            Alerte alerte(id, adresse, securite, "En attente");
+            if (alerte.ajouter()) {
+                qDebug() << "Alerte créée automatiquement pour la maison" << id << "avec niveau de sécurité" << securite;
+            }
+        }
+        
         reinitialiserFormulaireMaison();
         chargerMaisons();
     } else {
@@ -1619,6 +1987,16 @@ void MainWindow::onModifierMaison()
     QString errorText;
     if (m.modifier(oldId, newId, &errorText)) {
         QMessageBox::information(this, "Succès", "Maison modifiée avec succès !");
+        
+        // Créer une alerte automatiquement si le niveau de sécurité est faible (< 3)
+        // et qu'il n'existe pas déjà d'alerte active pour cette maison
+        if (securite < 3 && !Alerte::existeAlertePourMaison(newId)) {
+            Alerte alerte(newId, adresse, securite, "En attente");
+            if (alerte.ajouter()) {
+                qDebug() << "Alerte créée automatiquement pour la maison" << newId << "avec niveau de sécurité" << securite;
+            }
+        }
+        
         reinitialiserFormulaireMaison();
         chargerMaisons();
     } else {
@@ -1671,10 +2049,39 @@ void MainWindow::onMaisonSelectionChanged()
         return;
     }
     
+    // Récupérer l'ID de la maison sélectionnée
+    int idMaison = ui->tableau_7->item(row, 0)->text().toInt();
+    
     // Remplir le formulaire avec les données sélectionnées
     if (ui->idmaisonline) ui->idmaisonline->setText(ui->tableau_7->item(row, 0)->text());
     if (ui->adresseline_2) ui->adresseline_2->setText(ui->tableau_7->item(row, 1)->text());
     if (ui->nivsecline) ui->nivsecline->setText(ui->tableau_7->item(row, 2)->text());
+    
+    // Remplir le ComboBox avec tous les résidents disponibles
+    if (ui->comboResidentsMaison) {
+        ui->comboResidentsMaison->clear();
+        ui->comboResidentsMaison->addItem("-- Sélectionner un résident à assigner --", "");
+        
+        // Récupérer tous les résidents
+        QList<Resident> tousResidents = Resident::recupererTout();
+        for (const Resident &resident : tousResidents) {
+            QString display = QString("%1 %2 - %3")
+                .arg(resident.nom(), resident.prenom(), resident.telephone());
+            ui->comboResidentsMaison->addItem(display, resident.id());
+        }
+    }
+    
+    // Afficher les résidents actuels de cette maison
+    if (ui->labelResidentsMaison) {
+        QStringList residents = Maison::getResidentsParMaison(idMaison);
+        if (residents.isEmpty()) {
+            ui->labelResidentsMaison->setText("Résidents actuels : Aucun");
+        } else {
+            QString texte = QString("Résidents actuels (%1):\n").arg(residents.count());
+            texte += residents.join("\n");
+            ui->labelResidentsMaison->setText(texte);
+        }
+    }
 }
 
 void MainWindow::reinitialiserFormulaireMaison()
@@ -1682,4 +2089,2044 @@ void MainWindow::reinitialiserFormulaireMaison()
     if (ui->idmaisonline) ui->idmaisonline->clear();
     if (ui->adresseline_2) ui->adresseline_2->clear();
     if (ui->nivsecline) ui->nivsecline->clear();
+    if (ui->comboResidentsMaison) ui->comboResidentsMaison->clear();
+    if (ui->labelResidentsMaison) ui->labelResidentsMaison->setText("Résidents actuels : -");
 }
+
+// ============================================================
+// GESTION DES JARDINS
+// ============================================================
+
+void MainWindow::chargerJardins()
+{
+    if (!ui->tableau_8) {
+        return;
+    }
+
+    QString error;
+    const QList<Jardin> jardins = Jardin::fetchAll(&error);
+    if (!error.isEmpty()) {
+        QMessageBox::critical(this, tr("Jardins"), tr("Impossible de charger les jardins :\n%1").arg(error));
+        return;
+    }
+
+    ui->tableau_8->clearContents();
+    ui->tableau_8->setRowCount(jardins.size());
+
+    const QLocale locale;
+    int row = 0;
+    for (const Jardin &j : jardins) {
+        ui->tableau_8->setItem(row, 0, new QTableWidgetItem(QString::number(j.id())));
+        ui->tableau_8->setItem(row, 1, new QTableWidgetItem(j.emplacement()));
+        ui->tableau_8->setItem(row, 2, new QTableWidgetItem(locale.toString(j.superficie(), 'f', 2)));
+        ui->tableau_8->setItem(row, 3, new QTableWidgetItem(j.typeSol()));
+        ui->tableau_8->setItem(row, 4, new QTableWidgetItem(locale.toString(j.temperatureMoyenneSol(), 'f', 1) + " °C"));
+        QTableWidgetItem *typeItem = new QTableWidgetItem(j.typeChoix());
+        typeItem->setToolTip(tr("Type de sol : %1").arg(j.typeSol()));
+        ui->tableau_8->setItem(row, 5, typeItem);
+        ++row;
+    }
+}
+
+void MainWindow::onAjouterJardin()
+{
+    if (!ui->idjardinline || !ui->emplacementline || !ui->superficieline || !ui->superficieline_2) {
+        QMessageBox::warning(this, tr("Jardins"), tr("Formulaire incomplet"));
+        return;
+    }
+
+    bool ok = false;
+    const int id = ui->idjardinline->text().trimmed().toInt(&ok);
+    if (!ok || id <= 0) {
+        QMessageBox::warning(this, tr("Jardins"), tr("L'identifiant doit être un entier positif."));
+        return;
+    }
+
+    if (Jardin::idExists(id)) {
+        QMessageBox::warning(this, tr("Jardins"), tr("L'identifiant %1 existe déjà.").arg(id));
+        return;
+    }
+
+    const QString emplacement = ui->emplacementline->text().trimmed();
+    if (emplacement.isEmpty()) {
+        QMessageBox::warning(this, tr("Jardins"), tr("L'emplacement est obligatoire."));
+        return;
+    }
+
+    const double superficie = ui->superficieline->text().trimmed().toDouble(&ok);
+    if (!ok || superficie <= 0) {
+        QMessageBox::warning(this, tr("Jardins"), tr("La superficie doit être un nombre positif."));
+        return;
+    }
+
+    const QString typeSol = ui->superficieline_2->text().trimmed();
+    if (typeSol.isEmpty()) {
+        QMessageBox::warning(this, tr("Jardins"), tr("Le type de sol est obligatoire."));
+        return;
+    }
+
+    double temperatureMoyenneSol = 0.0;
+    if (ui->tempsolline) {
+        temperatureMoyenneSol = ui->tempsolline->text().trimmed().toDouble(&ok);
+        if (!ok) {
+            QMessageBox::warning(this, tr("Jardins"), tr("La température doit être un nombre valide."));
+            return;
+        }
+    }
+
+    const QString typeChoix = ui->typechoix ? ui->typechoix->currentText().trimmed() : QString();
+    if (typeChoix.isEmpty()) {
+        QMessageBox::warning(this, tr("Jardins"), tr("Veuillez sélectionner le type de jardin."));
+        return;
+    }
+
+    Jardin jardin(id, emplacement, superficie, typeSol, temperatureMoyenneSol, typeChoix);
+    QString error;
+    if (jardin.ajouter(&error)) {
+        chargerJardins();
+        reinitialiserFormulaireJardin();
+        QMessageBox::information(this, tr("Jardins"), tr("Jardin ajouté avec succès."));
+    } else {
+        QMessageBox::critical(this, tr("Jardins"), tr("Échec de l'ajout :\n%1").arg(error));
+    }
+}
+
+void MainWindow::onModifierJardin()
+{
+    if (!ui->tableau_8 || ui->tableau_8->currentRow() < 0) {
+        QMessageBox::warning(this, tr("Jardins"), tr("Veuillez sélectionner un jardin."));
+        return;
+    }
+
+    const int oldId = ui->tableau_8->item(ui->tableau_8->currentRow(), 0)->text().toInt();
+
+    bool ok = false;
+    const int newId = ui->idjardinline->text().trimmed().toInt(&ok);
+    if (!ok || newId <= 0) {
+        QMessageBox::warning(this, tr("Jardins"), tr("L'identifiant doit être un entier positif."));
+        return;
+    }
+
+    const QString emplacement = ui->emplacementline->text().trimmed();
+    if (emplacement.isEmpty()) {
+        QMessageBox::warning(this, tr("Jardins"), tr("L'emplacement est obligatoire."));
+        return;
+    }
+
+    const double superficie = ui->superficieline->text().trimmed().toDouble(&ok);
+    if (!ok || superficie <= 0) {
+        QMessageBox::warning(this, tr("Jardins"), tr("La superficie doit être un nombre positif."));
+        return;
+    }
+
+    const QString typeSol = ui->superficieline_2->text().trimmed();
+    const QString typeChoix = ui->typechoix ? ui->typechoix->currentText().trimmed() : QString();
+
+    double temperatureMoyenneSol = 0.0;
+    if (ui->tempsolline) {
+        bool tempOk = false;
+        temperatureMoyenneSol = ui->tempsolline->text().trimmed().toDouble(&tempOk);
+        if (!tempOk) {
+            QMessageBox::warning(this, tr("Jardins"), tr("La température doit être un nombre valide."));
+            return;
+        }
+    }
+
+    Jardin jardin(newId, emplacement, superficie, typeSol, temperatureMoyenneSol, typeChoix);
+    QString error;
+    if (jardin.modifier(oldId, &error)) {
+        chargerJardins();
+        reinitialiserFormulaireJardin();
+        QMessageBox::information(this, tr("Jardins"), tr("Jardin modifié avec succès."));
+    } else {
+        QMessageBox::critical(this, tr("Jardins"), tr("Échec de la modification :\n%1").arg(error));
+    }
+}
+
+void MainWindow::onSupprimerJardin()
+{
+    if (!ui->tableau_8 || ui->tableau_8->currentRow() < 0) {
+        QMessageBox::warning(this, tr("Jardins"), tr("Veuillez sélectionner un jardin."));
+        return;
+    }
+
+    const int id = ui->tableau_8->item(ui->tableau_8->currentRow(), 0)->text().toInt();
+    const QString emplacement = ui->tableau_8->item(ui->tableau_8->currentRow(), 1)->text();
+
+    const auto reponse = QMessageBox::question(this,
+                                               tr("Jardins"),
+                                               tr("Supprimer le jardin %1 (%2) ?").arg(id).arg(emplacement));
+    if (reponse != QMessageBox::Yes) {
+        return;
+    }
+
+    QString error;
+    if (Jardin::supprimer(id, &error)) {
+        chargerJardins();
+        reinitialiserFormulaireJardin();
+        QMessageBox::information(this, tr("Jardins"), tr("Jardin supprimé."));
+    } else {
+        QMessageBox::critical(this, tr("Jardins"), tr("Échec de la suppression :\n%1").arg(error));
+    }
+}
+
+void MainWindow::onExporterJardinsPdf()
+{
+    if (!ui->tableau_8 || ui->tableau_8->rowCount() == 0) {
+        QMessageBox::information(this, tr("Jardins"), tr("Aucun jardin à exporter."));
+        return;
+    }
+
+    QString chemin = QFileDialog::getSaveFileName(this,
+                                                  tr("Exporter les jardins"),
+                                                  QDir::homePath() + "/jardins.pdf",
+                                                  tr("Documents PDF (*.pdf)"));
+    if (chemin.isEmpty()) {
+        return;
+    }
+    if (!chemin.endsWith(".pdf", Qt::CaseInsensitive)) {
+        chemin += ".pdf";
+    }
+
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(chemin);
+    printer.setPageMargins(QMarginsF(15, 15, 15, 15));
+
+    QTextDocument document;
+    document.setHtml(construireHtmlJardins());
+    document.print(&printer);
+
+    QMessageBox::information(this, tr("Jardins"), tr("Le fichier %1 a été généré.").arg(QFileInfo(chemin).fileName()));
+}
+
+void MainWindow::onJardinSelectionChanged()
+{
+    if (!ui->tableau_8) {
+        return;
+    }
+
+    const int row = ui->tableau_8->currentRow();
+    if (row < 0) {
+        return;
+    }
+
+    if (ui->idjardinline) ui->idjardinline->setText(ui->tableau_8->item(row, 0)->text());
+    if (ui->emplacementline) ui->emplacementline->setText(ui->tableau_8->item(row, 1)->text());
+    if (ui->superficieline) ui->superficieline->setText(ui->tableau_8->item(row, 2)->text());
+    if (ui->superficieline_2) ui->superficieline_2->setText(ui->tableau_8->item(row, 3)->text());
+    if (ui->tempsolline) {
+        QString tempText = ui->tableau_8->item(row, 4)->text();
+        tempText.remove(" °C"); // Enlever l'unité pour l'édition
+        ui->tempsolline->setText(tempText);
+    }
+    if (ui->typechoix) {
+        const QString type = ui->tableau_8->item(row, 5)->text();
+        const int index = ui->typechoix->findText(type);
+        if (index >= 0) {
+            ui->typechoix->setCurrentIndex(index);
+        }
+    }
+}
+
+void MainWindow::onTrierJardinsParType()
+{
+    if (!ui->tableau_8) {
+        return;
+    }
+
+    QString error;
+    const QList<Jardin> jardins = Jardin::fetchAllSortedByType(&error);
+    if (!error.isEmpty()) {
+        QMessageBox::critical(this, tr("Jardins"), tr("Impossible de trier les jardins :\n%1").arg(error));
+        return;
+    }
+
+    ui->tableau_8->clearContents();
+    ui->tableau_8->setRowCount(jardins.size());
+
+    const QLocale locale;
+    int row = 0;
+    for (const Jardin &j : jardins) {
+        ui->tableau_8->setItem(row, 0, new QTableWidgetItem(QString::number(j.id())));
+        ui->tableau_8->setItem(row, 1, new QTableWidgetItem(j.emplacement()));
+        ui->tableau_8->setItem(row, 2, new QTableWidgetItem(locale.toString(j.superficie(), 'f', 2)));
+        ui->tableau_8->setItem(row, 3, new QTableWidgetItem(j.typeSol()));
+        ui->tableau_8->setItem(row, 4, new QTableWidgetItem(locale.toString(j.temperatureMoyenneSol(), 'f', 1) + " °C"));
+        QTableWidgetItem *typeItem = new QTableWidgetItem(j.typeChoix());
+        typeItem->setToolTip(tr("Type de sol : %1").arg(j.typeSol()));
+        ui->tableau_8->setItem(row, 5, typeItem);
+        ++row;
+    }
+
+    QMessageBox::information(this, tr("Tri"), tr("Jardins triés par type avec succès !"));
+}
+
+void MainWindow::onTrierJardinsParId()
+{
+    if (!ui->tableau_8) {
+        return;
+    }
+
+    QString error;
+    const QList<Jardin> jardins = Jardin::fetchAllSortedById(&error);
+    if (!error.isEmpty()) {
+        QMessageBox::critical(this, tr("Jardins"), tr("Impossible de trier les jardins :\n%1").arg(error));
+        return;
+    }
+
+    ui->tableau_8->clearContents();
+    ui->tableau_8->setRowCount(jardins.size());
+
+    const QLocale locale;
+    int row = 0;
+    for (const Jardin &j : jardins) {
+        ui->tableau_8->setItem(row, 0, new QTableWidgetItem(QString::number(j.id())));
+        ui->tableau_8->setItem(row, 1, new QTableWidgetItem(j.emplacement()));
+        ui->tableau_8->setItem(row, 2, new QTableWidgetItem(locale.toString(j.superficie(), 'f', 2)));
+        ui->tableau_8->setItem(row, 3, new QTableWidgetItem(j.typeSol()));
+        ui->tableau_8->setItem(row, 4, new QTableWidgetItem(locale.toString(j.temperatureMoyenneSol(), 'f', 1) + " °C"));
+        QTableWidgetItem *typeItem = new QTableWidgetItem(j.typeChoix());
+        typeItem->setToolTip(tr("Type de sol : %1").arg(j.typeSol()));
+        ui->tableau_8->setItem(row, 5, typeItem);
+        ++row;
+    }
+
+    QMessageBox::information(this, tr("Tri"), tr("Jardins triés par ID avec succès !"));
+}
+
+void MainWindow::onTrierJardinsParSuperficie()
+{
+    if (!ui->tableau_8) {
+        return;
+    }
+
+    QString error;
+    const QList<Jardin> jardins = Jardin::fetchAllSortedBySuperficie(&error);
+    if (!error.isEmpty()) {
+        QMessageBox::critical(this, tr("Jardins"), tr("Impossible de trier les jardins :\n%1").arg(error));
+        return;
+    }
+
+    ui->tableau_8->clearContents();
+    ui->tableau_8->setRowCount(jardins.size());
+
+    const QLocale locale;
+    int row = 0;
+    for (const Jardin &j : jardins) {
+        ui->tableau_8->setItem(row, 0, new QTableWidgetItem(QString::number(j.id())));
+        ui->tableau_8->setItem(row, 1, new QTableWidgetItem(j.emplacement()));
+        ui->tableau_8->setItem(row, 2, new QTableWidgetItem(locale.toString(j.superficie(), 'f', 2)));
+        ui->tableau_8->setItem(row, 3, new QTableWidgetItem(j.typeSol()));
+        ui->tableau_8->setItem(row, 4, new QTableWidgetItem(locale.toString(j.temperatureMoyenneSol(), 'f', 1) + " °C"));
+        QTableWidgetItem *typeItem = new QTableWidgetItem(j.typeChoix());
+        typeItem->setToolTip(tr("Type de sol : %1").arg(j.typeSol()));
+        ui->tableau_8->setItem(row, 5, typeItem);
+        ++row;
+    }
+
+    QMessageBox::information(this, tr("Tri"), tr("Jardins triés par superficie avec succès !"));
+}
+
+void MainWindow::onRechercherJardin()
+{
+    if (!ui->tableau_8 || !ui->rechechelabel) {
+        return;
+    }
+
+    QString recherche = ui->rechechelabel->text().trimmed();
+    
+    if (recherche.isEmpty()) {
+        // Si la recherche est vide, afficher tous les jardins
+        chargerJardins();
+        return;
+    }
+
+    QString error;
+    const QList<Jardin> tousJardins = Jardin::fetchAll(&error);
+    if (!error.isEmpty()) {
+        QMessageBox::critical(this, tr("Jardins"), tr("Impossible de charger les jardins :\n%1").arg(error));
+        return;
+    }
+
+    // Filtrer les jardins selon le critère de recherche
+    QList<Jardin> jardinsFiltres;
+    for (const Jardin &j : tousJardins) {
+        if (QString::number(j.id()).contains(recherche, Qt::CaseInsensitive) ||
+            j.emplacement().contains(recherche, Qt::CaseInsensitive) ||
+            j.typeSol().contains(recherche, Qt::CaseInsensitive) ||
+            j.typeChoix().contains(recherche, Qt::CaseInsensitive) ||
+            QString::number(j.superficie()).contains(recherche)) {
+            jardinsFiltres.append(j);
+        }
+    }
+
+    // Afficher les résultats
+    ui->tableau_8->clearContents();
+    ui->tableau_8->setRowCount(jardinsFiltres.size());
+
+    const QLocale locale;
+    int row = 0;
+    for (const Jardin &j : jardinsFiltres) {
+        ui->tableau_8->setItem(row, 0, new QTableWidgetItem(QString::number(j.id())));
+        ui->tableau_8->setItem(row, 1, new QTableWidgetItem(j.emplacement()));
+        ui->tableau_8->setItem(row, 2, new QTableWidgetItem(locale.toString(j.superficie(), 'f', 2)));
+        ui->tableau_8->setItem(row, 3, new QTableWidgetItem(j.typeSol()));
+        ui->tableau_8->setItem(row, 4, new QTableWidgetItem(locale.toString(j.temperatureMoyenneSol(), 'f', 1) + " °C"));
+        QTableWidgetItem *typeItem = new QTableWidgetItem(j.typeChoix());
+        typeItem->setToolTip(tr("Type de sol : %1").arg(j.typeSol()));
+        ui->tableau_8->setItem(row, 5, typeItem);
+        ++row;
+    }
+
+    if (jardinsFiltres.isEmpty()) {
+        QMessageBox::information(this, tr("Recherche"), tr("Aucun jardin trouvé pour \"%1\"").arg(recherche));
+    }
+}
+
+void MainWindow::reinitialiserFormulaireJardin()
+{
+    if (ui->idjardinline) ui->idjardinline->clear();
+    if (ui->emplacementline) ui->emplacementline->clear();
+    if (ui->superficieline) ui->superficieline->clear();
+    if (ui->superficieline_2) ui->superficieline_2->clear();
+    if (ui->tempsolline) ui->tempsolline->clear();
+    if (ui->typechoix) ui->typechoix->setCurrentIndex(0);
+}
+
+QString MainWindow::construireHtmlJardins() const
+{
+    QString error;
+    const QList<Jardin> jardins = Jardin::fetchAll(&error);
+    QString html = QStringLiteral("<h2>Liste des jardins</h2>");
+
+    if (!error.isEmpty()) {
+        html += QStringLiteral("<p>%1</p>").arg(error.toHtmlEscaped());
+        return html;
+    }
+
+    html += QStringLiteral("<table border='1' cellspacing='0' cellpadding='4'>");
+    html += QStringLiteral("<tr><th>ID</th><th>Emplacement</th><th>Superficie</th><th>Type de sol</th><th>Température moy. sol</th><th>Type</th></tr>");
+    const QLocale locale;
+    for (const Jardin &j : jardins) {
+        html += QStringLiteral("<tr><td>%1</td><td>%2</td><td>%3 m²</td><td>%4</td><td>%5 °C</td><td>%6</td></tr>")
+                    .arg(j.id())
+                    .arg(j.emplacement().toHtmlEscaped())
+                    .arg(locale.toString(j.superficie(), 'f', 2))
+                    .arg(j.typeSol().toHtmlEscaped())
+                    .arg(locale.toString(j.temperatureMoyenneSol(), 'f', 1))
+                    .arg(j.typeChoix().toHtmlEscaped());
+    }
+    html += QStringLiteral("</table>");
+    return html;
+}
+
+void MainWindow::onAssignerResidentMaison()
+{
+    if (!ui->idmaisonline) {
+        QMessageBox::warning(this, "Erreur", "Veuillez sélectionner une maison d'abord !");
+        return;
+    }
+    
+    // Récupérer l'ID de la maison
+    int idMaison = ui->idmaisonline->text().toInt();
+    if (idMaison <= 0) {
+        QMessageBox::warning(this, "Erreur", "Veuillez sélectionner une maison valide !");
+        return;
+    }
+    
+    // Récupérer l'ID du résident depuis le ComboBox
+    QString idResident;
+    if (ui->comboResidentsMaison) {
+        idResident = ui->comboResidentsMaison->currentData().toString();
+    }
+    
+    if (idResident.isEmpty()) {
+        QMessageBox::warning(this, "Erreur", "Veuillez sélectionner un résident dans la liste !");
+        return;
+    }
+    
+    // Assigner le résident à la maison
+    if (Maison::assignerResidentAMaison(idResident, idMaison)) {
+        QMessageBox::information(this, "Succès", "Résident assigné à la maison avec succès !");
+        
+        // Rafraîchir l'affichage
+        chargerMaisons();
+        
+        // Mettre à jour la liste des résidents actuels
+        if (ui->labelResidentsMaison) {
+            QStringList residents = Maison::getResidentsParMaison(idMaison);
+            if (residents.isEmpty()) {
+                ui->labelResidentsMaison->setText("Résidents actuels : Aucun");
+            } else {
+                QString texte = QString("Résidents actuels (%1):\n").arg(residents.count());
+                texte += residents.join("\n");
+                ui->labelResidentsMaison->setText(texte);
+            }
+        }
+        
+        // Réinitialiser le ComboBox
+        if (ui->comboResidentsMaison) {
+            ui->comboResidentsMaison->setCurrentIndex(0);
+        }
+    } else {
+        QMessageBox::critical(this, "Erreur", "Échec de l'assignation du résident !");
+    }
+}
+
+/* ============================================================
+ *                   GESTION DES ALERTES
+ * ============================================================ */
+
+void MainWindow::onGestionAlertes()
+{
+    // Pour l'instant, afficher les alertes dans un message box ou une boîte de dialogue
+    chargerAlertes();
+    QMessageBox::information(this, "Alertes", "Les alertes sont affichées dans le tableau.");
+}
+
+void MainWindow::on_Alertes_clicked()
+{
+    ui->stackedWidget->setCurrentIndex(3);
+    ui->stackedWidget_5->setCurrentIndex(1);
+    refreshAlertes();
+}
+
+void MainWindow::chargerAlertes()
+{
+    if (!ui->tableau_10) {
+        return;
+    }
+    
+    QSqlQuery query("SELECT ID, ID_MAISON, ZONE, NIVEAU, STATUT, DATE_ALERTE FROM GEST_ALERTES ORDER BY DATE_ALERTE DESC",
+                    QSqlDatabase::database("qt_oracle"));
+    
+    ui->tableau_10->clearContents();
+    ui->tableau_10->setRowCount(0);
+    
+    // Configurer 7 colonnes (6 données + 1 bouton localisation)
+    ui->tableau_10->setColumnCount(7);
+    
+    // Définir les en-têtes
+    QStringList headers;
+    headers << "ID" << "ID Maison" << "Zone" << "Niveau" << "Statut" << "Date" << "Localisation";
+    ui->tableau_10->setHorizontalHeaderLabels(headers);
+    
+    int row = 0;
+    while (query.next()) {
+        ui->tableau_10->insertRow(row);
+        
+        QString zone = query.value("ZONE").toString();
+        
+        ui->tableau_10->setItem(row, 0, new QTableWidgetItem(query.value("ID").toString()));
+        ui->tableau_10->setItem(row, 1, new QTableWidgetItem(query.value("ID_MAISON").toString()));
+        ui->tableau_10->setItem(row, 2, new QTableWidgetItem(zone));
+        ui->tableau_10->setItem(row, 3, new QTableWidgetItem(query.value("NIVEAU").toString()));
+        ui->tableau_10->setItem(row, 4, new QTableWidgetItem(query.value("STATUT").toString()));
+        ui->tableau_10->setItem(row, 5, new QTableWidgetItem(query.value("DATE_ALERTE").toDate().toString("dd/MM/yyyy")));
+        
+        // Créer un bouton "Localiser" pour chaque alerte
+        QPushButton *btnLocaliser = new QPushButton("🗺️ Localiser");
+        btnLocaliser->setStyleSheet("background-color: #007bff; color: white; border-radius: 6px; padding: 4px 8px; font-weight: bold;");
+        btnLocaliser->setCursor(Qt::PointingHandCursor);
+        
+        // Connecter le bouton à la fonction de localisation avec la zone capturée
+        connect(btnLocaliser, &QPushButton::clicked, this, [this, zone]() {
+            loadMapForZone(zone);
+        });
+        
+        ui->tableau_10->setCellWidget(row, 6, btnLocaliser);
+        
+        row++;
+    }
+    
+    if (ui->tableau_10->horizontalHeader()) {
+        ui->tableau_10->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    }
+}
+
+void MainWindow::onAjouterAlerte()
+{
+    // Utiliser des boîtes de dialogue pour saisir les informations
+    bool ok;
+    int idMaison = QInputDialog::getInt(this, "Ajouter Alerte", "ID de la maison:", 1, 1, 10000, 1, &ok);
+    if (!ok) return;
+    
+    QString zone = QInputDialog::getText(this, "Ajouter Alerte", "Zone/Adresse:", QLineEdit::Normal, "", &ok);
+    if (!ok || zone.isEmpty()) return;
+    
+    int niveau = QInputDialog::getInt(this, "Ajouter Alerte", "Niveau de sécurité (1-5):", 1, 1, 5, 1, &ok);
+    if (!ok) return;
+    
+    QStringList statuts = {"En attente", "En cours", "Traitée"};
+    QString statut = QInputDialog::getItem(this, "Ajouter Alerte", "Statut:", statuts, 0, false, &ok);
+    if (!ok) return;
+    
+    Alerte alerte(idMaison, zone, niveau, statut);
+    
+    if (alerte.ajouter()) {
+        QMessageBox::information(this, "Succès", "Alerte ajoutée avec succès !");
+        chargerAlertes();
+    } else {
+        QMessageBox::critical(this, "Erreur", "Échec de l'ajout de l'alerte !");
+    }
+}
+
+void MainWindow::onModifierAlerte()
+{
+    if (!ui->tableau_10) {
+        return;
+    }
+    
+    int row = ui->tableau_10->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, "Erreur", "Veuillez sélectionner une alerte à modifier !");
+        return;
+    }
+    
+    int id = ui->tableau_10->item(row, 0)->text().toInt();
+    int currentIdMaison = ui->tableau_10->item(row, 1)->text().toInt();
+    QString currentZone = ui->tableau_10->item(row, 2)->text();
+    int currentNiveau = ui->tableau_10->item(row, 3)->text().toInt();
+    QString currentStatut = ui->tableau_10->item(row, 4)->text();
+    
+    bool ok;
+    int idMaison = QInputDialog::getInt(this, "Modifier Alerte", "ID de la maison:", currentIdMaison, 1, 10000, 1, &ok);
+    if (!ok) return;
+    
+    QString zone = QInputDialog::getText(this, "Modifier Alerte", "Zone/Adresse:", QLineEdit::Normal, currentZone, &ok);
+    if (!ok) return;
+    
+    int niveau = QInputDialog::getInt(this, "Modifier Alerte", "Niveau:", currentNiveau, 1, 5, 1, &ok);
+    if (!ok) return;
+    
+    QStringList statuts = {"En attente", "En cours", "Traitée"};
+    QString statut = QInputDialog::getItem(this, "Modifier Alerte", "Statut:", statuts, statuts.indexOf(currentStatut), false, &ok);
+    if (!ok) return;
+    
+    Alerte alerte(idMaison, zone, niveau, statut);
+    
+    if (alerte.modifier(id)) {
+        QMessageBox::information(this, "Succès", "Alerte modifiée avec succès !");
+        chargerAlertes();
+    } else {
+        QMessageBox::critical(this, "Erreur", "Échec de la modification de l'alerte !");
+    }
+}
+
+void MainWindow::onSupprimerAlerte()
+{
+    if (!ui->tableau_10) {
+        return;
+    }
+    
+    int row = ui->tableau_10->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, "Erreur", "Veuillez sélectionner une alerte à supprimer !");
+        return;
+    }
+    
+    int id = ui->tableau_10->item(row, 0)->text().toInt();
+    QString zone = ui->tableau_10->item(row, 2)->text();
+    
+    auto reponse = QMessageBox::question(this, "Confirmation",
+                                          "Supprimer l'alerte " + QString::number(id) + " pour " + zone + " ?",
+                                          QMessageBox::Yes | QMessageBox::No);
+    
+    if (reponse != QMessageBox::Yes) {
+        return;
+    }
+    
+    Alerte alerte;
+    if (alerte.supprimer(id)) {
+        QMessageBox::information(this, "Succès", "Alerte supprimée avec succès !");
+        reinitialiserFormulaireAlerte();
+        chargerAlertes();
+    } else {
+        QMessageBox::critical(this, "Erreur", "Échec de la suppression de l'alerte !");
+    }
+}
+
+void MainWindow::onAlerteSelectionChanged()
+{
+    if (!ui->tableau_10) {
+        return;
+    }
+    
+    int row = ui->tableau_10->currentRow();
+    if (row < 0) {
+        return;
+    }
+    
+    // Afficher les informations de l'alerte sélectionnée (optionnel)
+    // Les données sont déjà visibles dans le tableau
+}
+
+void MainWindow::onMarquerAlerteTraitee()
+{
+    if (!ui->tableau_10) {
+        return;
+    }
+    
+    int row = ui->tableau_10->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, "Erreur", "Veuillez sélectionner une alerte !");
+        return;
+    }
+    
+    int id = ui->tableau_10->item(row, 0)->text().toInt();
+    
+    Alerte alerte;
+    if (alerte.marquerCommeTraitee(id)) {
+        QMessageBox::information(this, "Succès", "Alerte marquée comme traitée !");
+        chargerAlertes();
+    } else {
+        QMessageBox::critical(this, "Erreur", "Échec de la mise à jour !");
+    }
+}
+
+void MainWindow::onRetourAlertes()
+{
+    // Retour à la page des maisons
+    if (ui->stackedWidget && ui->pageMaisons) {
+        ui->stackedWidget->setCurrentWidget(ui->pageMaisons);
+    }
+}
+
+void MainWindow::on_btnRetourAlertes_clicked()
+{
+    ui->stackedWidget_5->setCurrentIndex(0);
+}
+
+void MainWindow::reinitialiserFormulaireAlerte()
+{
+    // Pas de formulaire à réinitialiser car on utilise des dialogues
+}
+
+void MainWindow::connectAlerteButtons()
+{
+    // Connecter les boutons de gestion des alertes si disponibles dans l'UI
+    // Les boutons spécifiques aux alertes peuvent être ajoutés plus tard dans l'UI Designer
+    
+    if (ui->btnRetourAlertes) {
+        connect(ui->btnRetourAlertes, &QPushButton::clicked, this, &MainWindow::onRetourAlertes);
+    }
+    if (ui->btnAfficherCarte) {
+        connect(ui->btnAfficherCarte, &QPushButton::clicked, this, &MainWindow::onAfficherCarte);
+    }
+    if (ui->tableau_10) {
+        connect(ui->tableau_10, &QTableWidget::itemSelectionChanged, this, &MainWindow::onAlerteSelectionChanged);
+    }
+}
+
+void MainWindow::refreshAlertes()
+{
+    chargerAlertes();
+}
+
+/* ============================================================
+ *          CARTE ET LOCALISATION DES ALERTES
+ * ============================================================ */
+
+void MainWindow::onAfficherCarte()
+{
+    if (!ui->tableau_10) {
+        return;
+    }
+    
+    int row = ui->tableau_10->currentRow();
+    if (row < 0) {
+        QMessageBox::information(this, "Carte", "Veuillez sélectionner une alerte.");
+        return;
+    }
+    
+    // Récupérer la zone de l'alerte sélectionnée (colonne 2)
+    QString zone = ui->tableau_10->item(row, 2)->text();
+    loadMapForZone(zone);
+}
+
+void MainWindow::loadMapForZone(const QString &zone)
+{
+    if (!net) {
+        QMessageBox::warning(this, "Erreur", "Gestionnaire réseau non disponible.");
+        return;
+    }
+    
+    // Géocodage de l'adresse via Nominatim (OpenStreetMap)
+    QUrl geocode("https://nominatim.openstreetmap.org/search");
+    QUrlQuery query;
+    query.addQueryItem("q", zone);
+    query.addQueryItem("format", "json");
+    query.addQueryItem("limit", "1");
+    geocode.setQuery(query);
+    
+    QNetworkRequest req(geocode);
+    req.setRawHeader("User-Agent", QByteArray("QtSmartCity/1.0"));
+    
+    QNetworkReply *r = net->get(req);
+    connect(r, &QNetworkReply::finished, this, [this, r]() {
+        if (r->error() != QNetworkReply::NoError) {
+            QMessageBox::warning(this, "Carte", "Géocodage indisponible.");
+            r->deleteLater();
+            return;
+        }
+        
+        QByteArray data = r->readAll();
+        r->deleteLater();
+        
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (!doc.isArray() || doc.array().isEmpty()) {
+            QMessageBox::information(this, "Carte", "Adresse introuvable.");
+            return;
+        }
+        
+        QJsonObject obj = doc.array().first().toObject();
+        QString lat = obj.value("lat").toString();
+        QString lon = obj.value("lon").toString();
+        
+        // Essayer de charger une carte statique
+        QUrl imgUrl(QString("http://staticmap.openstreetmap.de/staticmap.php?center=%1,%2&zoom=14&size=370x230&markers=%1,%2,red-pushpin")
+                        .arg(lat, lon));
+        QNetworkRequest imgReq(imgUrl);
+        imgReq.setRawHeader("User-Agent", QByteArray("QtSmartCity/1.0"));
+        
+        QNetworkReply *ri = net->get(imgReq);
+        connect(ri, &QNetworkReply::finished, this, [this, ri, lat, lon]() {
+            if (ri->error() == QNetworkReply::NoError) {
+                QByteArray bytes = ri->readAll();
+                ri->deleteLater();
+                QPixmap pix;
+                if (pix.loadFromData(bytes)) {
+                    sceneCarte->clear();
+                    sceneCarte->addPixmap(pix);
+                    if (viewCarte) viewCarte->show();
+                    return;
+                }
+            }
+            ri->deleteLater();
+            
+            // Fallback : charger une tuile OpenStreetMap
+            bool okLat = false, okLon = false;
+            double dLat = lat.toDouble(&okLat);
+            double dLon = lon.toDouble(&okLon);
+            
+            if (!okLat || !okLon) {
+                QMessageBox::warning(this, "Carte", "Localisation introuvable.");
+                return;
+            }
+            
+            // Calculer la tuile OSM
+            int zoom = 14;
+            double latRad = qDegreesToRadians(dLat);
+            double n = (1 << zoom);
+            int xTile = qFloor((dLon + 180.0) / 360.0 * n);
+            int yTile = qFloor((1.0 - log(tan(latRad) + 1.0 / cos(latRad)) / M_PI) / 2.0 * n);
+            
+            QUrl tileUrl(QString("http://tile.openstreetmap.org/%1/%2/%3.png")
+                            .arg(QString::number(zoom), QString::number(xTile), QString::number(yTile)));
+            QNetworkRequest tileReq(tileUrl);
+            tileReq.setRawHeader("User-Agent", QByteArray("QtSmartCity/1.0"));
+            
+            QNetworkReply *rt = net->get(tileReq);
+            connect(rt, &QNetworkReply::finished, this, [this, rt, dLat, dLon, zoom, xTile, yTile]() {
+                if (rt->error() != QNetworkReply::NoError) {
+                    QMessageBox::warning(this, "Carte", "Impossible de charger la localisation.");
+                    rt->deleteLater();
+                    return;
+                }
+                
+                QByteArray tileBytes = rt->readAll();
+                rt->deleteLater();
+                
+                QPixmap tilePix;
+                if (!tilePix.loadFromData(tileBytes)) {
+                    QMessageBox::information(this, "Carte", "Image de tuile invalide.");
+                    return;
+                }
+                
+                // Calculer la position du marqueur sur la tuile
+                double latRad2 = qDegreesToRadians(dLat);
+                double n2 = (1 << zoom);
+                double pixelX = ((dLon + 180.0) / 360.0) * 256.0 * n2;
+                double pixelY = ((1.0 - log(tan(latRad2) + 1.0 / cos(latRad2)) / M_PI) / 2.0) * 256.0 * n2;
+                double localX = pixelX - 256.0 * xTile;
+                double localY = pixelY - 256.0 * yTile;
+                
+                // Dessiner le marqueur rouge
+                QPixmap composed = tilePix.copy();
+                QPainter p(&composed);
+                p.setRenderHint(QPainter::Antialiasing, true);
+                p.setPen(QPen(Qt::red, 2));
+                p.setBrush(QBrush(Qt::red));
+                p.drawEllipse(QPointF(localX, localY), 6, 6);
+                p.end();
+                
+                // Afficher la carte
+                sceneCarte->clear();
+                sceneCarte->addPixmap(composed);
+                if (viewCarte) viewCarte->show();
+            });
+        });
+    });
+}
+
+
+// ===========================================================================================
+// FONCTIONS POUR CHATBOT ET RECOMMANDATIONS IA - VÉHICULES
+// À ajouter à la fin de mainwindow.cpp
+// ===========================================================================================
+
+// ========== CHATBOT VÉHICULE ==========
+void MainWindow::on_btnChatbotVehicule_clicked()
+{
+    if (ui->stackedWidget_3) {
+        ui->stackedWidget_3->setCurrentWidget(ui->page_10);
+    }
+}
+
+void MainWindow::on_btnBackFromChatVehicule_clicked()
+{
+    if (ui->stackedWidget_3) {
+        ui->stackedWidget_3->setCurrentWidget(ui->page_9);
+    }
+}
+
+void MainWindow::on_btnSendChatVehicule_clicked()
+{
+    if (!ui->textEditChatInputVehicule || !ui->textEditChatOutputVehicule) {
+        return;
+    }
+    
+    QString userMsg = ui->textEditChatInputVehicule->toPlainText().trimmed();
+    if (userMsg.isEmpty()) {
+        return;
+    }
+    
+    // Afficher le message de l'utilisateur
+    QString current = ui->textEditChatOutputVehicule->toPlainText();
+    current += "\n🧑 Vous: " + userMsg + "\n";
+    ui->textEditChatOutputVehicule->setPlainText(current);
+    ui->textEditChatInputVehicule->clear();
+    
+    // Ajouter message de chargement
+    current += "🤖 SmartHelp IA: Analyse en cours...\n";
+    ui->textEditChatOutputVehicule->setPlainText(current);
+    
+    // Récupérer le contexte de la base de données
+    QString contextDB = getVehiculesDatabaseContext();
+    
+    // Construire le prompt complet avec contexte
+    QString fullPrompt = QString("Contexte de la base de données véhicules:\n%1\n\nQuestion de l'utilisateur: %2")
+        .arg(contextDB)
+        .arg(userMsg);
+    
+    // Envoyer à Azure OpenAI pour réponse dynamique
+    sendMessageToAzureAI(fullPrompt);
+    
+    // Auto-scroll vers le bas
+    QTextCursor cursor = ui->textEditChatOutputVehicule->textCursor();
+    cursor.movePosition(QTextCursor::End);
+    ui->textEditChatOutputVehicule->setTextCursor(cursor);
+}
+
+QString MainWindow::getVehiculesDatabaseContext()
+{
+    QString context = "";
+    
+    // Statistiques globales
+    QSqlQuery countQuery;
+    countQuery.prepare("SELECT COUNT(*) FROM VEHICULE");
+    if (countQuery.exec() && countQuery.next()) {
+        int total = countQuery.value(0).toInt();
+        context += QString("Nombre total de véhicules: %1\n").arg(total);
+    }
+    
+    // Répartition par état
+    QSqlQuery etatQuery;
+    etatQuery.prepare("SELECT ETAT, COUNT(*) FROM VEHICULE GROUP BY ETAT");
+    if (etatQuery.exec()) {
+        context += "Répartition par état:\n";
+        while (etatQuery.next()) {
+            context += QString("  - %1: %2 véhicule(s)\n")
+                .arg(etatQuery.value(0).toString())
+                .arg(etatQuery.value(1).toInt());
+        }
+    }
+    
+    // Liste des véhicules (limité à 20 pour ne pas surcharger)
+    QSqlQuery listQuery;
+    listQuery.prepare("SELECT IMMAT, MARQUE, MODELE, TYPE, ETAT, SERVICE, TO_CHAR(DATE_MAINT, 'DD/MM/YYYY') FROM VEHICULE ORDER BY IMMAT FETCH FIRST 20 ROWS ONLY");
+    if (listQuery.exec()) {
+        context += "\nListe des véhicules:\n";
+        while (listQuery.next()) {
+            context += QString("  • %1 - %2 %3 | Type: %4 | État: %5 | Service: %6 | Maintenance: %7\n")
+                .arg(listQuery.value(0).toString())
+                .arg(listQuery.value(1).toString())
+                .arg(listQuery.value(2).toString())
+                .arg(listQuery.value(3).toString())
+                .arg(listQuery.value(4).toString())
+                .arg(listQuery.value(5).toString())
+                .arg(listQuery.value(6).toString());
+        }
+    }
+    
+    return context;
+}
+
+QString MainWindow::processChatMessageVehicule(const QString &msg)
+{
+    QString m = msg.toLower();
+
+    // --- Questions sur les véhicules disponibles ---
+    if (m.contains("combien") && (m.contains("vehicule") || m.contains("voiture"))) {
+        QSqlQuery query;
+        query.prepare("SELECT COUNT(*) FROM VEHICULE");
+        if (query.exec() && query.next()) {
+            int count = query.value(0).toInt();
+            return QString("Il y a actuellement %1 véhicule(s) dans la base de données.").arg(count);
+        }
+        return "Impossible de récupérer le nombre de véhicules.";
+    }
+
+    // --- Questions sur l'état des véhicules ---
+    if ((m.contains("combien") || m.contains("nombre")) && (m.contains("neuf") || m.contains("use") || m.contains("panne"))) {
+        QString etat;
+        if (m.contains("neuf")) etat = "Neuf";
+        else if (m.contains("use")) etat = "Use";
+        else if (m.contains("panne")) etat = "En panne";
+        
+        QSqlQuery query;
+        query.prepare("SELECT COUNT(*) FROM VEHICULE WHERE UPPER(ETAT) = :etat");
+        query.bindValue(":etat", etat.toUpper());
+        if (query.exec() && query.next()) {
+            int count = query.value(0).toInt();
+            return QString("Il y a %1 véhicule(s) en état '%2'.").arg(count).arg(etat);
+        }
+    }
+
+    // --- Liste des véhicules ---
+    if (m.contains("liste") || m.contains("affiche") || (m.contains("tous") && m.contains("vehicule"))) {
+        QSqlQuery query;
+        query.prepare("SELECT IMMAT, MARQUE, MODELE FROM VEHICULE ORDER BY IMMAT");
+        if (query.exec()) {
+            QString result = "📋 Liste des véhicules :\n\n";
+            int count = 0;
+            while (query.next() && count < 10) {
+                result += QString("• %1 - %2 %3\n")
+                    .arg(query.value(0).toString())
+                    .arg(query.value(1).toString())
+                    .arg(query.value(2).toString());
+                count++;
+            }
+            if (count == 0) result = "Aucun véhicule trouvé.";
+            else if (count == 10) result += "\n(Affichage limité aux 10 premiers résultats)";
+            return result;
+        }
+    }
+
+    // --- Recherche par marque ---
+    if (m.contains("marque")) {
+        QStringList words = m.split(QRegularExpression("\\s+"));
+        QString marque = "";
+        for (int i = 0; i < words.size(); i++) {
+            if (words[i] == "marque" && i + 1 < words.size()) {
+                marque = words[i + 1];
+                break;
+            }
+        }
+        
+        if (!marque.isEmpty()) {
+            QSqlQuery query;
+            query.prepare("SELECT IMMAT, MODELE, ETAT FROM VEHICULE WHERE UPPER(MARQUE) LIKE :marque");
+            query.bindValue(":marque", "%" + marque.toUpper() + "%");
+            if (query.exec()) {
+                QString result = QString("🔍 Véhicules de marque '%1' :\n\n").arg(marque);
+                int count = 0;
+                while (query.next()) {
+                    result += QString("• %1 - %2 (État: %3)\n")
+                        .arg(query.value(0).toString())
+                        .arg(query.value(1).toString())
+                        .arg(query.value(2).toString());
+                    count++;
+                }
+                if (count == 0) result = QString("Aucun véhicule de marque '%1' trouvé.").arg(marque);
+                return result;
+            }
+        }
+    }
+
+    // --- Recherche par immatriculation ---
+    if ((m.contains("immat") || m.contains("plaque")) && !m.contains("recherche")) {
+        QStringList words = m.split(QRegularExpression("\\s+"));
+        QString immat = "";
+        for (int i = 0; i < words.size(); i++) {
+            if ((words[i] == "immat" || words[i] == "immatriculation" || words[i] == "plaque") && i + 1 < words.size()) {
+                immat = words[i + 1];
+                break;
+            }
+        }
+        
+        if (!immat.isEmpty()) {
+            QSqlQuery query;
+            query.prepare("SELECT MARQUE, MODELE, TYPE, ETAT, SERVICE FROM VEHICULE WHERE UPPER(IMMAT) LIKE :immat");
+            query.bindValue(":immat", "%" + immat.toUpper() + "%");
+            if (query.exec() && query.next()) {
+                return QString("🚗 Véhicule %1 :\n\n• Marque: %2\n• Modèle: %3\n• Type: %4\n• État: %5\n• Service: %6")
+                    .arg(immat)
+                    .arg(query.value(0).toString())
+                    .arg(query.value(1).toString())
+                    .arg(query.value(2).toString())
+                    .arg(query.value(3).toString())
+                    .arg(query.value(4).toString());
+            } else {
+                return QString("Véhicule '%1' non trouvé.").arg(immat);
+            }
+        }
+    }
+
+    // --- Véhicules en panne ---
+    if (m.contains("panne") && !m.contains("combien")) {
+        QSqlQuery query;
+        query.prepare("SELECT IMMAT, MARQUE, MODELE FROM VEHICULE WHERE UPPER(ETAT) = 'EN PANNE'");
+        if (query.exec()) {
+            QString result = "⚠️ Véhicules en panne :\n\n";
+            int count = 0;
+            while (query.next()) {
+                result += QString("• %1 - %2 %3\n")
+                    .arg(query.value(0).toString())
+                    .arg(query.value(1).toString())
+                    .arg(query.value(2).toString());
+                count++;
+            }
+            if (count == 0) result = "Aucun véhicule en panne ! 👍";
+            return result;
+        }
+    }
+
+    // --- Dernière maintenance ---
+    if (m.contains("dernier") && m.contains("maintenance")) {
+        QSqlQuery query;
+        query.prepare("SELECT IMMAT, MARQUE, MODELE, TO_CHAR(DATE_MAINT, 'DD/MM/YYYY') FROM VEHICULE ORDER BY DATE_MAINT DESC FETCH FIRST 5 ROWS ONLY");
+        if (query.exec()) {
+            QString result = "🔧 Dernières maintenances :\n\n";
+            while (query.next()) {
+                result += QString("• %1 - %2 %3 (le %4)\n")
+                    .arg(query.value(0).toString())
+                    .arg(query.value(1).toString())
+                    .arg(query.value(2).toString())
+                    .arg(query.value(3).toString());
+            }
+            return result;
+        }
+    }
+
+    // --- Aide sur l'ajout ---
+    if (m.contains("ajouter") && (m.contains("vehicule") || m.contains("voiture")))
+        return "Pour ajouter un véhicule : remplissez les champs (Immatriculation, Marque, Modèle, Type, État, Service, Date maintenance) puis cliquez sur 'Ajouter'.";
+
+    // --- Aide sur la modification ---
+    if (m.contains("modifier") || m.contains("update"))
+        return "Pour modifier un véhicule : sélectionnez-le dans le tableau, modifiez les champs souhaités, puis cliquez sur 'Modifier'.";
+
+    // --- Aide sur la suppression ---
+    if (m.contains("supprimer") || m.contains("delete"))
+        return "Pour supprimer un véhicule : sélectionnez-le dans le tableau puis cliquez sur 'Supprimer'. Une confirmation vous sera demandée.";
+
+    // --- Aide sur la recherche ---
+    if (m.contains("recherche") || m.contains("chercher") || m.contains("filtrer"))
+        return "Tapez une immatriculation dans la barre de recherche '🔍 Rechercher par immatriculation...' pour filtrer les véhicules en temps réel.";
+
+    // --- Aide sur l'état ---
+    if (m.contains("etat"))
+        return "Les états disponibles sont :\n• Neuf : véhicule en excellent état\n• Use : véhicule usagé mais fonctionnel\n• En panne : véhicule nécessitant une réparation";
+
+    // --- Aide sur la date de maintenance ---
+    if (m.contains("date") && m.contains("maintenance"))
+        return "La date de maintenance indique la dernière intervention effectuée sur le véhicule. Format attendu : JJ/MM/AAAA. Vous pouvez trier les véhicules par date via le bouton '📅 Tri par date'.";
+
+    // --- Aide sur le tri ---
+    if (m.contains("tri") || m.contains("trier"))
+        return "Le bouton '📅 Tri par date' permet de trier les véhicules par date de maintenance croissante ou décroissante. Cliquez plusieurs fois pour inverser l'ordre.";
+
+    // --- Aide sur les statistiques ---
+    if (m.contains("statistique") || m.contains("graphique"))
+        return "Le bouton '📊 Statistiques' affiche un graphique en secteurs montrant la répartition des véhicules par état (Neuf, Use, En panne).";
+
+    // --- Aide sur les recommandations IA ---
+    if (m.contains("recommandation") || m.contains("ia") || m.contains("ai"))
+        return "Sélectionnez un véhicule puis cliquez sur '🔧 Recommandation IA' pour obtenir des conseils de maintenance personnalisés basés sur l'intelligence artificielle Azure OpenAI.";
+
+    // --- Aide générale ---
+    if (m.contains("aide") || m.contains("help") || m.contains("?"))
+        return "🤖 Je peux vous aider avec :\n\n• Combien de véhicules ?\n• Liste tous les véhicules\n• Véhicules en panne\n• Marque [nom]\n• Immat [code]\n• Dernière maintenance\n• Comment ajouter/modifier/supprimer ?\n• Statistiques\n• Recommandation IA";
+
+    // --- Message par défaut ---
+    return "Je n'ai pas compris 😅. Tapez 'aide' pour voir ce que je peux faire, ou essayez :\n• Combien de véhicules ?\n• Liste tous les véhicules\n• Véhicules en panne\n• Marque Renault";
+}
+
+// ========== RECOMMANDATIONS IA VÉHICULE ==========
+void MainWindow::on_btnRecommandationVehicule_clicked()
+{
+    qDebug() << "🔎 [DEBUG] on_btnRecommandationVehicule_clicked() triggered";
+    qDebug() << "🔎 [DEBUG] selectedImmatVehicule current value:" << selectedImmatVehicule;
+
+    if (selectedImmatVehicule.isEmpty()) {
+        qDebug() << "⚠️ [DEBUG] No vehicle selected before recommendation!";
+        QMessageBox::warning(this,
+                             "Erreur",
+                             "Veuillez d'abord sélectionner un véhicule avant de demander une recommandation.");
+        return;
+    }
+
+    // Construire le message pour l'IA à partir du véhicule courant
+    QString prompt = buildMaintenancePromptFromCurrentVehicule();
+    qDebug() << "📨 [DEBUG] Maintenance prompt envoyé à Azure :" << prompt;
+
+    // Nettoyer la zone avant la réponse
+    if (ui->textEditRecommandationVehicule) {
+        ui->textEditRecommandationVehicule->clear();
+        ui->textEditRecommandationVehicule->setPlainText("Génération de la recommandation en cours...");
+    }
+
+    // Lancer l'appel Azure
+    sendRecommendationToAzureAI(prompt);
+
+    // Afficher la page de recommandation
+    if (ui->stackedWidget_3) {
+        ui->stackedWidget_3->setCurrentWidget(ui->page_11);
+    }
+}
+
+void MainWindow::on_btnBackFromRecommandationVehicule_clicked()
+{
+    if (ui->stackedWidget_3) {
+        ui->stackedWidget_3->setCurrentWidget(ui->page_9);
+    }
+}
+
+QString MainWindow::buildMaintenancePromptFromCurrentVehicule() const
+{
+    QString immat   = ui->immatline_2 ? ui->immatline_2->text() : "";
+    QString marque  = ui->marqueline_2 ? ui->marqueline_2->text() : "";
+    QString modele  = ui->modeleline_2 ? ui->modeleline_2->text() : "";
+    QString type    = ui->triemail_2 ? ui->triemail_2->currentText() : "";
+    QString etat    = ui->Etatline_2 ? ui->Etatline_2->currentText() : "";
+    QString service = ui->serviceline_2 ? ui->serviceline_2->text() : "";
+    
+    QDate date_maint;
+    if (ui->datemaintline_2) {
+        date_maint = QDate::fromString(ui->datemaintline_2->text(), "dd/MM/yyyy");
+    }
+
+    // 🔥 Get today's REAL date from system
+    QString today = QDate::currentDate().toString("dd/MM/yyyy");
+
+    QString vehiculeInfo = QString(
+                               "Nous sommes le %1.\n"
+                               "Données véhicule :\n"
+                               "Immatriculation : %2\n"
+                               "Marque : %3\n"
+                               "Modèle : %4\n"
+                               "Type : %5\n"
+                               "État : %6\n"
+                               "Service : %7\n"
+                               "Date de dernière maintenance : %8\n\n"
+                               "En te basant uniquement sur ces données, propose une recommandation d'entretien "
+                               "pratique et cohérente avec la date du jour. Réponds en français, texte simple, "
+                               "sans markdown, en maximum 10 lignes."
+                               ).arg(
+                                   today,
+                                   immat,
+                                   marque,
+                                   modele,
+                                   type,
+                                   etat,
+                                   service,
+                                   date_maint.isValid() ? date_maint.toString("dd/MM/yyyy") : "inconnue"
+                                   );
+
+    return vehiculeInfo;
+}
+
+void MainWindow::sendMessageToAzureAI(const QString &message)
+{
+    qDebug() << "🚀 sendMessageToAzureAI() démarre (Chatbot)";
+
+    QString endpoint   = "https://ai-kassem.cognitiveservices.azure.com";
+    QString apiKey     = "445NLYUwthBdj5EbFvxbCxV2XSdJWKYartumAOvqEFMtKEofmdpuJQQJ99BGACfhMk5XJ3w3AAAAACOGRpAA";
+    QString apiVersion = "2024-12-01-preview";
+    QString model      = "gpt-4o";
+
+    QString url = endpoint
+                  + "/openai/deployments/"
+                  + model
+                  + "/chat/completions?api-version="
+                  + apiVersion;
+
+    QNetworkRequest request{ QUrl(url) };
+    request.setRawHeader("Content-Type", "application/json");
+    request.setRawHeader("api-key", apiKey.toUtf8());
+
+    QString systemPrompt = R"(Tu es SmartHelp, un assistant intelligent pour la gestion des véhicules SmartCity.
+Tu as accès aux données complètes de la flotte de véhicules.
+
+Instructions:
+- Réponds toujours en français, de manière claire et concise
+- Utilise les données fournies dans le contexte pour répondre avec précision
+- Si on te demande des statistiques, analyse les données et donne des chiffres précis
+- Si on te demande des conseils, base-toi sur l'état et l'historique des véhicules
+- Formate tes réponses avec des emojis pertinents (🚗, 📊, ⚠️, ✅, etc.)
+- Maximum 10 lignes par réponse
+- Sois professionnel mais amical)";
+
+    QJsonObject systemMsg;
+    systemMsg["role"]    = "system";
+    systemMsg["content"] = systemPrompt;
+
+    QJsonObject userMsg;
+    userMsg["role"]    = "user";
+    userMsg["content"] = message;
+
+    QJsonArray arr;
+    arr.append(systemMsg);
+    arr.append(userMsg);
+
+    QJsonObject payload;
+    payload["messages"]    = arr;
+    payload["temperature"] = 0.7;
+
+    QByteArray jsonData = QJsonDocument(payload).toJson();
+    QNetworkReply *reply = networkManagerVehicule->post(request, jsonData);
+
+    connect(reply, &QNetworkReply::finished, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            qDebug() << "❌ ERROR Chatbot:" << reply->errorString();
+            if (ui->textEditChatOutputVehicule) {
+                QString current = ui->textEditChatOutputVehicule->toPlainText();
+                current = current.replace("🤖 SmartHelp IA: Analyse en cours...\n", "");
+                current += "❌ Erreur de connexion à l'IA. Veuillez réessayer.\n";
+                ui->textEditChatOutputVehicule->setPlainText(current);
+            }
+            reply->deleteLater();
+            return;
+        }
+
+        QByteArray data = reply->readAll();
+        QJsonDocument json = QJsonDocument::fromJson(data);
+        QString bot = json["choices"][0]["message"]["content"].toString();
+
+        if (ui->textEditChatOutputVehicule) {
+            QString current = ui->textEditChatOutputVehicule->toPlainText();
+            // Supprimer le message temporaire "Analyse en cours..."
+            current = current.replace("🤖 SmartHelp IA: Analyse en cours...\n", "");
+            current += "🤖 SmartHelp IA: " + bot.trimmed() + "\n";
+            ui->textEditChatOutputVehicule->setPlainText(current);
+            
+            // Auto-scroll vers le bas
+            QTextCursor cursor = ui->textEditChatOutputVehicule->textCursor();
+            cursor.movePosition(QTextCursor::End);
+            ui->textEditChatOutputVehicule->setTextCursor(cursor);
+        }
+
+        reply->deleteLater();
+    });
+}
+
+void MainWindow::sendRecommendationToAzureAI(const QString &message)
+{
+    qDebug() << "🚀 sendRecommendationToAzureAI() démarre";
+
+    QString endpoint   = "https://ai-kassem.cognitiveservices.azure.com";
+    QString apiKey     = "445NLYUwthBdj5EbFvxbCxV2XSdJWKYartumAOvqEFMtKEofmdpuJQQJ99BGACfhMk5XJ3w3AAAAACOGRpAA";
+    QString apiVersion = "2024-12-01-preview";
+    QString model      = "gpt-4o";
+
+    QString url = endpoint
+                  + "/openai/deployments/"
+                  + model
+                  + "/chat/completions?api-version="
+                  + apiVersion;
+
+    QNetworkRequest request{ QUrl(url) };
+    request.setRawHeader("Content-Type", "application/json");
+    request.setRawHeader("api-key", apiKey.toUtf8());
+
+    QString systemPrompt = R"(Tu es SmartHelp, assistant SmartCity.
+Tu donnes des recommandations de maintenance pour les véhicules.
+Réponds toujours en français, en texte simple, sans markdown, en maximum 10 lignes.)";
+
+    QJsonObject systemMsg;
+    systemMsg["role"]    = "system";
+    systemMsg["content"] = systemPrompt;
+
+    QJsonObject userMsg;
+    userMsg["role"]    = "user";
+    userMsg["content"] = message;
+
+    QJsonArray arr;
+    arr.append(systemMsg);
+    arr.append(userMsg);
+
+    QJsonObject payload;
+    payload["messages"]    = arr;
+    payload["temperature"] = 0.4;
+
+    QByteArray jsonData = QJsonDocument(payload).toJson();
+    QNetworkReply *reply = networkManagerVehicule->post(request, jsonData);
+
+    connect(reply, &QNetworkReply::finished, [this, reply]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            qDebug() << "❌ ERROR Recommandation:" << reply->errorString();
+            if (ui->textEditRecommandationVehicule) {
+                ui->textEditRecommandationVehicule->setPlainText("Erreur Azure : " + reply->errorString());
+            }
+            reply->deleteLater();
+            return;
+        }
+
+        QByteArray data = reply->readAll();
+        QJsonDocument json = QJsonDocument::fromJson(data);
+        QString bot = json["choices"][0]["message"]["content"].toString();
+
+        if (ui->textEditRecommandationVehicule) {
+            ui->textEditRecommandationVehicule->setPlainText(bot.trimmed());
+        }
+
+        reply->deleteLater();
+    });
+}
+
+// ========== STATISTIQUES VÉHICULE ==========
+QChartView* MainWindow::createVehiculePieChart()
+{
+    QSqlQuery query;
+    QMap<QString, int> etatCount;
+
+    if (!query.exec("SELECT ETAT, COUNT(*) FROM VEHICULE GROUP BY ETAT")) {
+        qDebug() << "❌ Erreur statistiques:" << query.lastError().text();
+        return nullptr;
+    }
+
+    while (query.next()) {
+        QString etat = query.value(0).toString();
+        int count = query.value(1).toInt();
+        etatCount[etat] = count;
+    }
+
+    QPieSeries *series = new QPieSeries();
+    for (auto it = etatCount.begin(); it != etatCount.end(); ++it) {
+        series->append(it.key() + " (" + QString::number(it.value()) + ")", it.value());
+    }
+
+    QChart *chart = new QChart();
+    chart->addSeries(series);
+    chart->setTitle("Répartition des véhicules par état");
+    chart->setAnimationOptions(QChart::SeriesAnimations);
+
+    QChartView *chartView = new QChartView(chart);
+    chartView->setRenderHint(QPainter::Antialiasing);
+
+    return chartView;
+}
+
+void MainWindow::on_btnStatistiquesVehicule_clicked()
+{
+    QChartView *chartView = createVehiculePieChart();
+    if (!chartView) {
+        QMessageBox::warning(this, "Erreur", "Impossible de générer les statistiques.");
+        return;
+    }
+
+    QDialog *dialog = new QDialog(this);
+    dialog->setWindowTitle("Statistiques Véhicules");
+    dialog->resize(600, 400);
+
+    QVBoxLayout *layout = new QVBoxLayout(dialog);
+    layout->addWidget(chartView);
+    dialog->setLayout(layout);
+
+    dialog->exec();
+}
+
+// ========== TRI PAR DATE ==========
+void MainWindow::on_btnTriDateVehicule_clicked()
+{
+    if (!ui->tableau_3) {
+        return;
+    }
+
+    triCroissantVehicule = !triCroissantVehicule;
+
+    QSqlQuery query;
+    QString order = triCroissantVehicule ? "ASC" : "DESC";
+    query.prepare("SELECT IMMAT, MARQUE, MODELE, TYPE, ETAT, SERVICE, DATE_MAINT "
+                  "FROM VEHICULE ORDER BY DATE_MAINT " + order);
+
+    if (!query.exec()) {
+        qDebug() << "❌ Erreur tri:" << query.lastError().text();
+        return;
+    }
+
+    ui->tableau_3->setRowCount(0);
+    int row = 0;
+    while (query.next()) {
+        ui->tableau_3->insertRow(row);
+        for (int col = 0; col < 7; ++col) {
+            QString value = query.value(col).toString();
+            if (col == 6 && !value.isEmpty()) { // Date
+                QDate date = query.value(col).toDate();
+                value = date.toString("dd/MM/yyyy");
+            }
+            ui->tableau_3->setItem(row, col, new QTableWidgetItem(value));
+        }
+        row++;
+    }
+
+    QString btnText = triCroissantVehicule ? "Tri Date ↑" : "Tri Date ↓";
+    if (ui->btnTriDateVehicule) {
+        ui->btnTriDateVehicule->setText(btnText);
+    }
+}
+
+// ========== RECHERCHE VÉHICULE ==========
+void MainWindow::on_lineEditRechercheVehicule_textChanged(const QString &text)
+{
+    if (!ui->tableau_3) {
+        return;
+    }
+
+    QString searchText = text.trimmed();
+    if (searchText.isEmpty()) {
+        chargerVehicules();
+        return;
+    }
+
+    QSqlQuery query;
+    query.prepare("SELECT IMMAT, MARQUE, MODELE, TYPE, ETAT, SERVICE, DATE_MAINT "
+                  "FROM VEHICULE WHERE UPPER(IMMAT) LIKE :search "
+                  "ORDER BY ID_VEHI DESC");
+    query.bindValue(":search", "%" + searchText.toUpper() + "%");
+
+    if (!query.exec()) {
+        qDebug() << "❌ Erreur recherche:" << query.lastError().text();
+        return;
+    }
+
+    ui->tableau_3->setRowCount(0);
+    int row = 0;
+    while (query.next()) {
+        ui->tableau_3->insertRow(row);
+        for (int col = 0; col < 7; ++col) {
+            QString value = query.value(col).toString();
+            if (col == 6 && !value.isEmpty()) {
+                QDate date = query.value(col).toDate();
+                value = date.toString("dd/MM/yyyy");
+            }
+            ui->tableau_3->setItem(row, col, new QTableWidgetItem(value));
+        }
+        row++;
+    }
+}
+
+// ========================================
+// FONCTIONS ARDUINO RFID
+// ========================================
+
+void MainWindow::onRFIDScanned(const QString &rfidCode)
+{
+    qDebug() << "🔍 RFID scanné:" << rfidCode;
+    
+    // Rechercher le résident avec ce code RFID
+    QSqlQuery query;
+    query.prepare(
+        "SELECT r.ID, r.NOM, r.PRENOM, r.EMAIL, r.TELEPHONE, "
+        "       m.ID, m.ADRESSE, m.TYPE "
+        "FROM GEST_RESIDENT r "
+        "LEFT JOIN GEST_MAISON m ON r.ID_MAISON = m.ID "
+        "WHERE r.RFID_CODE = :rfid"
+    );
+    query.bindValue(":rfid", rfidCode);
+    
+    if (!query.exec()) {
+        QMessageBox::warning(this, "Erreur", 
+            "Erreur lors de la recherche du résident:\n" + query.lastError().text());
+        return;
+    }
+    
+    if (query.next()) {
+        // Résident trouvé
+        QString nom = query.value(1).toString();
+        QString prenom = query.value(2).toString();
+        QString email = query.value(3).toString();
+        QString telephone = query.value(4).toString();
+        
+        QString maisonInfo;
+        if (!query.value(5).isNull()) {
+            QString adresse = query.value(6).toString();
+            QString type = query.value(7).toString();
+            
+            maisonInfo = QString(
+                "\n\n🏠 MAISON ASSIGNÉE:\n"
+                "Adresse: %1\n"
+                "Type: %2"
+            ).arg(adresse, type);
+        } else {
+            maisonInfo = "\n\n⚠️ Aucune maison assignée";
+        }
+        
+        QString message = QString(
+            "✅ ACCÈS AUTORISÉ\n\n"
+            "👤 RÉSIDENT:\n"
+            "Nom: %1 %2\n"
+            "Email: %3\n"
+            "Téléphone: %4"
+            "%5\n\n"
+            "🚪 La porte s'ouvre..."
+        ).arg(nom, prenom, email, telephone, maisonInfo);
+        
+        QMessageBox::information(this, "RFID - Accès Autorisé", message);
+        
+        // 🚪 OUVRIR LE SERVO MOTEUR
+        arduinoRFID->ouvrirPorte();
+        
+    } else {
+        // Résident non trouvé - log only, no dialog
+        qDebug() << "❌ Accès refusé - RFID inconnu:";
+    }
+}
+
+// Contrôle manuel du servo-moteur - Bouton Ouvrir
+void MainWindow::on_btnOuvrirServo_clicked()
+{
+    if (!arduinoRFID->isConnected()) {
+        QMessageBox::warning(this, "Servo", "Arduino non connecté !");
+        return;
+    }
+    
+    qDebug() << "🔧 Envoi commande manuelle: OPEN";
+    QByteArray commande = "OPEN\n";
+    arduinoRFID->getSerialPort()->write(commande);
+    arduinoRFID->getSerialPort()->flush();
+    QMessageBox::information(this, "Servo", "✅ Commande OPEN envoyée!\nLe servo ouvrira et fermera automatiquement.");
+}
+
+// Contrôle manuel du servo-moteur - Bouton Fermer
+void MainWindow::on_btnFermerServo_clicked()
+{
+    if (!arduinoRFID->isConnected()) {
+        QMessageBox::warning(this, "Servo", "Arduino non connecté !");
+        return;
+    }
+    
+    qDebug() << "🔧 Envoi commande manuelle: CLOSE";
+    QByteArray commande = "CLOSE\n";
+    arduinoRFID->getSerialPort()->write(commande);
+    arduinoRFID->getSerialPort()->flush();
+    QMessageBox::information(this, "Servo", "✅ Commande CLOSE envoyée!");
+}
+
+// Test automatique du servo-moteur
+void MainWindow::on_btnTestServo_clicked()
+{
+    if (!arduinoRFID->isConnected()) {
+        QMessageBox::warning(this, "Servo Test", "Arduino non connecté !");
+        return;
+    }
+    
+    qDebug() << "🔧 TEST AUTOMATIQUE DU SERVO";
+    QByteArray commande = "TEST\n";
+    arduinoRFID->getSerialPort()->write(commande);
+    arduinoRFID->getSerialPort()->flush();
+    QMessageBox::information(this, "Test Servo", "✅ Test lancé!\nLe servo va bouger pendant 2 secondes.");
+}
+
+// ============================================================
+// GESTION DES CABINETS
+// ============================================================
+
+void MainWindow::chargerCabinets()
+{
+    if (!ui->tableau_12) {
+        return;
+    }
+
+    QString error;
+    const QList<Cabinet> cabinets = Cabinet::fetchAll(&error);
+    if (!error.isEmpty()) {
+        QMessageBox::critical(this, tr("Cabinets"), tr("Impossible de charger les cabinets :\n%1").arg(error));
+        return;
+    }
+
+    ui->tableau_12->clearContents();
+    ui->tableau_12->setRowCount(cabinets.size());
+
+    int row = 0;
+    for (const Cabinet &c : cabinets) {
+        ui->tableau_12->setItem(row, 0, new QTableWidgetItem(QString::number(c.id())));
+        ui->tableau_12->setItem(row, 1, new QTableWidgetItem(c.nom()));
+        ui->tableau_12->setItem(row, 2, new QTableWidgetItem(c.adresse()));
+        ui->tableau_12->setItem(row, 3, new QTableWidgetItem(c.email()));
+        ui->tableau_12->setItem(row, 4, new QTableWidgetItem(c.specialite()));
+        ui->tableau_12->setItem(row, 5, new QTableWidgetItem(c.telephone()));
+        ui->tableau_12->setItem(row, 6, new QTableWidgetItem(c.idResident() > 0 ? QString::number(c.idResident()) : QString()));
+        ++row;
+    }
+}
+
+void MainWindow::onAjouterCabinet()
+{
+    if (!ui->idcabiline || !ui->nomline_2 || !ui->prenomline_2 || !ui->specline || !ui->telephoneline_2 || !ui->emailline_2) {
+        QMessageBox::warning(this, tr("Cabinets"), tr("Formulaire incomplet"));
+        return;
+    }
+
+    bool ok = false;
+    const int id = ui->idcabiline->text().trimmed().toInt(&ok);
+    if (!ok || id <= 0) {
+        QMessageBox::warning(this, tr("Cabinets"), tr("L'identifiant doit être un entier positif."));
+        return;
+    }
+
+    if (Cabinet::idExists(id)) {
+        QMessageBox::warning(this, tr("Cabinets"), tr("L'identifiant %1 existe déjà.").arg(id));
+        return;
+    }
+
+    const QString nom = ui->nomline_2->text().trimmed();
+    const QString adresse = ui->prenomline_2->text().trimmed();
+    const QString specialite = ui->specline->text().trimmed();
+    const QString telephone = ui->telephoneline_2->text().trimmed();
+    const QString email = ui->emailline_2->text().trimmed();
+
+    if (nom.isEmpty() || adresse.isEmpty() || specialite.isEmpty() || telephone.isEmpty() || email.isEmpty()) {
+        QMessageBox::warning(this, tr("Cabinets"), tr("Tous les champs sont obligatoires (sauf ID résident)."));
+        return;
+    }
+
+    QRegularExpression emailRegex(QStringLiteral("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"));
+    if (!emailRegex.match(email).hasMatch()) {
+        QMessageBox::warning(this, tr("Cabinets"), tr("Adresse e-mail invalide."));
+        return;
+    }
+
+    int idResident = -1;
+    if (ui->medecinline) {
+        const QString residentText = ui->medecinline->text().trimmed();
+        if (!residentText.isEmpty()) {
+            idResident = residentText.toInt(&ok);
+            if (!ok) {
+                QMessageBox::warning(this, tr("Cabinets"), tr("L'ID résident doit être numérique."));
+                return;
+            }
+        }
+    }
+
+    Cabinet cabinet(id, nom, adresse, specialite, telephone, email, idResident);
+    QString error;
+    if (cabinet.ajouter(&error)) {
+        chargerCabinets();
+        reinitialiserFormulaireCabinet();
+        QMessageBox::information(this, tr("Cabinets"), tr("Cabinet ajouté."));
+    } else {
+        QMessageBox::critical(this, tr("Cabinets"), tr("Échec de l'ajout :\n%1").arg(error));
+    }
+}
+
+void MainWindow::onModifierCabinet()
+{
+    if (!ui->tableau_12 || ui->tableau_12->currentRow() < 0) {
+        QMessageBox::warning(this, tr("Cabinets"), tr("Veuillez sélectionner un cabinet."));
+        return;
+    }
+
+    const int oldId = ui->tableau_12->item(ui->tableau_12->currentRow(), 0)->text().toInt();
+
+    bool ok = false;
+    const int newId = ui->idcabiline->text().trimmed().toInt(&ok);
+    if (!ok || newId <= 0) {
+        QMessageBox::warning(this, tr("Cabinets"), tr("L'identifiant doit être un entier positif."));
+        return;
+    }
+
+    const QString nom = ui->nomline_2->text().trimmed();
+    const QString adresse = ui->prenomline_2->text().trimmed();
+    const QString specialite = ui->specline->text().trimmed();
+    const QString telephone = ui->telephoneline_2->text().trimmed();
+    const QString email = ui->emailline_2->text().trimmed();
+
+    if (nom.isEmpty() || adresse.isEmpty() || specialite.isEmpty() || telephone.isEmpty() || email.isEmpty()) {
+        QMessageBox::warning(this, tr("Cabinets"), tr("Tous les champs sont obligatoires (sauf ID résident)."));
+        return;
+    }
+
+    int idResident = -1;
+    if (ui->medecinline) {
+        const QString residentText = ui->medecinline->text().trimmed();
+        if (!residentText.isEmpty()) {
+            idResident = residentText.toInt(&ok);
+            if (!ok) {
+                QMessageBox::warning(this, tr("Cabinets"), tr("L'ID résident doit être numérique."));
+                return;
+            }
+        }
+    }
+
+    Cabinet cabinet(newId, nom, adresse, specialite, telephone, email, idResident);
+    QString error;
+    if (cabinet.modifier(oldId, &error)) {
+        chargerCabinets();
+        reinitialiserFormulaireCabinet();
+        QMessageBox::information(this, tr("Cabinets"), tr("Cabinet modifié."));
+    } else {
+        QMessageBox::critical(this, tr("Cabinets"), tr("Échec de la modification :\n%1").arg(error));
+    }
+}
+
+void MainWindow::onSupprimerCabinet()
+{
+    if (!ui->tableau_12 || ui->tableau_12->currentRow() < 0) {
+        QMessageBox::warning(this, tr("Cabinets"), tr("Veuillez sélectionner un cabinet."));
+        return;
+    }
+
+    const int id = ui->tableau_12->item(ui->tableau_12->currentRow(), 0)->text().toInt();
+    const QString nom = ui->tableau_12->item(ui->tableau_12->currentRow(), 1)->text();
+
+    if (QMessageBox::question(this, tr("Cabinets"), tr("Supprimer le cabinet %1 (%2) ?").arg(id).arg(nom)) != QMessageBox::Yes) {
+        return;
+    }
+
+    QString error;
+    if (Cabinet::supprimer(id, &error)) {
+        chargerCabinets();
+        reinitialiserFormulaireCabinet();
+        QMessageBox::information(this, tr("Cabinets"), tr("Cabinet supprimé."));
+    } else {
+        QMessageBox::critical(this, tr("Cabinets"), tr("Échec de la suppression :\n%1").arg(error));
+    }
+}
+
+void MainWindow::onExporterCabinetsPdf()
+{
+    if (!ui->tableau_12 || ui->tableau_12->rowCount() == 0) {
+        QMessageBox::information(this, tr("Cabinets"), tr("Aucune donnée à exporter."));
+        return;
+    }
+
+    QString chemin = QFileDialog::getSaveFileName(this,
+                                                  tr("Exporter les cabinets"),
+                                                  QDir::homePath() + "/cabinets.pdf",
+                                                  tr("Documents PDF (*.pdf)"));
+    if (chemin.isEmpty()) {
+        return;
+    }
+    if (!chemin.endsWith(".pdf", Qt::CaseInsensitive)) {
+        chemin += ".pdf";
+    }
+
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(chemin);
+    printer.setPageMargins(QMarginsF(15, 15, 15, 15));
+
+    QTextDocument document;
+    document.setHtml(construireHtmlCabinets());
+    document.print(&printer);
+
+    QMessageBox::information(this, tr("Cabinets"), tr("Le fichier %1 a été généré.").arg(QFileInfo(chemin).fileName()));
+}
+
+void MainWindow::onCabinetSelectionChanged()
+{
+    if (!ui->tableau_12) {
+        return;
+    }
+
+    const int row = ui->tableau_12->currentRow();
+    if (row < 0) {
+        return;
+    }
+
+    if (ui->idcabiline) ui->idcabiline->setText(ui->tableau_12->item(row, 0)->text());
+    if (ui->nomline_2) ui->nomline_2->setText(ui->tableau_12->item(row, 1)->text());
+    if (ui->prenomline_2) ui->prenomline_2->setText(ui->tableau_12->item(row, 2)->text());
+    if (ui->emailline_2) ui->emailline_2->setText(ui->tableau_12->item(row, 3)->text());
+    if (ui->specline) ui->specline->setText(ui->tableau_12->item(row, 4)->text());
+    if (ui->telephoneline_2) ui->telephoneline_2->setText(ui->tableau_12->item(row, 5)->text());
+    if (ui->medecinline) ui->medecinline->setText(ui->tableau_12->item(row, 6)->text());
+}
+
+void MainWindow::onOuvrirCabinetAvance()
+{
+    CabinetDialog dialog(this);
+    dialog.exec();
+}
+
+void MainWindow::reinitialiserFormulaireCabinet()
+{
+    if (ui->idcabiline) ui->idcabiline->clear();
+    if (ui->nomline_2) ui->nomline_2->clear();
+    if (ui->prenomline_2) ui->prenomline_2->clear();
+    if (ui->specline) ui->specline->clear();
+    if (ui->telephoneline_2) ui->telephoneline_2->clear();
+    if (ui->emailline_2) ui->emailline_2->clear();
+    if (ui->medecinline) ui->medecinline->clear();
+}
+
+QString MainWindow::construireHtmlCabinets() const
+{
+    QString error;
+    const QList<Cabinet> cabinets = Cabinet::fetchAll(&error);
+    QString html = QStringLiteral("<h2>Liste des cabinets</h2>");
+    if (!error.isEmpty()) {
+        html += QStringLiteral("<p>%1</p>").arg(error.toHtmlEscaped());
+        return html;
+    }
+
+    html += QStringLiteral("<table border='1' cellspacing='0' cellpadding='4'>");
+    html += QStringLiteral("<tr><th>ID</th><th>Nom</th><th>Adresse</th><th>Email</th><th>Spécialité</th><th>Téléphone</th><th>ID résident</th></tr>");
+    for (const Cabinet &c : cabinets) {
+        html += QStringLiteral("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td><td>%6</td><td>%7</td></tr>")
+                    .arg(c.id())
+                    .arg(c.nom().toHtmlEscaped())
+                    .arg(c.adresse().toHtmlEscaped())
+                    .arg(c.email().toHtmlEscaped())
+                    .arg(c.specialite().toHtmlEscaped())
+                    .arg(c.telephone().toHtmlEscaped())
+                    .arg(c.idResident() > 0 ? QString::number(c.idResident()) : QString());
+    }
+    html += QStringLiteral("</table>");
+    return html;
+}
+
+// ============================================================
+// MAINTENANCE ET RECOMMANDATIONS JARDINS
+// ============================================================
+
+void MainWindow::onOuvrirMaintenanceDialog()
+{
+    MaintenanceDialog dialog(this);
+    dialog.exec();
+}
+
+void MainWindow::onOuvrirRecommandationDialog()
+{
+    RecommandationDialog dialog(this);
+    dialog.exec();
+}
+
+// ============================================================
+// CAPTEUR TEMPÉRATURE DHT11
+// ============================================================
+
+void MainWindow::onTemperatureRecue(float temperature, float humidite)
+{
+    qDebug() << QString("🌡️ Température: %1°C | 💧 Humidité: %2%")
+                .arg(temperature, 0, 'f', 1)
+                .arg(humidite, 0, 'f', 1);
+    
+    // Afficher dans l'interface graphique
+    ui->labelTemperature->setText(QString("🌡️ Température: %1°C").arg(temperature, 0, 'f', 1));
+    ui->labelHumidite->setText(QString("💧 Humidité: %1%").arg(humidite, 0, 'f', 1));
+}
+
+void MainWindow::onAlerteArrosage(const QStringList &jardinsAArroser)
+{
+    if (jardinsAArroser.isEmpty()) {
+        return;
+    }
+    
+    // Construire le message d'alerte
+    QString message = QString("💦 <b>ALERTE ARROSAGE</b><br><br>"
+                             "La température ambiante est élevée.<br>"
+                             "%1 jardin(s) nécessite(nt) un arrosage :<br><br>")
+                     .arg(jardinsAArroser.size());
+    
+    for (const QString &jardin : jardinsAArroser) {
+        message += "• " + jardin + "<br>";
+    }
+    
+    // Afficher dans une boîte de dialogue
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("Alerte Arrosage Jardins");
+    msgBox.setTextFormat(Qt::RichText);
+    msgBox.setText(message);
+    msgBox.setIcon(QMessageBox::Warning);
+    msgBox.setStandardButtons(QMessageBox::Ok);
+    msgBox.exec();
+    
+    // Log dans la console
+    qDebug() << "========================================";
+    qDebug() << "💦 ALERTE ARROSAGE -" << jardinsAArroser.size() << "jardin(s)";
+    qDebug() << "========================================";
+    for (const QString &jardin : jardinsAArroser) {
+        qDebug() << "  •" << jardin;
+    }
+    qDebug() << "========================================";
+}
+
+void MainWindow::onConnecterCapteurTemperature()
+{
+    // Si déjà connecté, proposer de déconnecter
+    if (m_temperatureSensor->isConnected()) {
+        QMessageBox::StandardButton reply = QMessageBox::question(this, 
+            "Capteur Température", 
+            "Le capteur est déjà connecté. Voulez-vous le déconnecter ?",
+            QMessageBox::Yes | QMessageBox::No);
+        
+        if (reply == QMessageBox::Yes) {
+            m_temperatureSensor->deconnecter();
+            ui->btnConnecterCapteur->setText("🔌 Connecter Capteur");
+            ui->btnConnecterCapteur->setStyleSheet(
+                "QPushButton { background-color: #17a2b8; color: white; border-radius: 5px; font: bold 10pt \"Arial\"; }"
+                "QPushButton:hover { background-color: #138496; }"
+            );
+            QMessageBox::information(this, "Capteur Température", "Capteur DHT11 déconnecté");
+        }
+        return;
+    }
+    
+    // Lister les ports disponibles
+    QStringList ports = ArduinoRFID::getAvailablePorts();
+    if (ports.isEmpty()) {
+        QMessageBox::warning(this, "Capteur Température", "Aucun port série disponible !");
+        return;
+    }
+    
+    // Demander à l'utilisateur de choisir un port
+    bool ok;
+    QString port = QInputDialog::getItem(this, "Capteur Température", 
+                                        "Sélectionnez le port du capteur DHT11:",
+                                        ports, 0, false, &ok);
+    if (ok && !port.isEmpty()) {
+        if (m_temperatureSensor->connecter(port)) {
+            ui->btnConnecterCapteur->setText("✅ Capteur Connecté");
+            ui->btnConnecterCapteur->setStyleSheet(
+                "QPushButton { background-color: #28a745; color: white; border-radius: 5px; font: bold 10pt \"Arial\"; }"
+                "QPushButton:hover { background-color: #218838; }"
+            );
+            QMessageBox::information(this, "Capteur Température", 
+                                   QString("✅ Capteur DHT11 connecté sur %1\n\n"
+                                           "Les données de température et d'humidité s'afficheront "
+                                           "automatiquement dans quelques secondes.").arg(port));
+        } else {
+            QMessageBox::warning(this, "Capteur Température", 
+                               QString("❌ Échec de connexion sur %1\n\n"
+                                       "Vérifiez que:\n"
+                                       "• L'Arduino est bien branché\n"
+                                       "• Le sketch DHT11 est téléversé\n"
+                                       "• Le port série est correct").arg(port));
+        }
+    }
+}
+
+void MainWindow::onDeconnecterCapteurTemperature()
+{
+    if (m_temperatureSensor->isConnected()) {
+        m_temperatureSensor->deconnecter();
+        QMessageBox::information(this, "Capteur Température", "Capteur DHT11 déconnecté");
+    } else {
+        QMessageBox::warning(this, "Capteur Température", "Capteur non connecté !");
+    }
+}
+

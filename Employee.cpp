@@ -31,8 +31,8 @@ bool Employee::insert(int &outId, QString &errorText) const
     }
 
     // Insertion (adapter au schéma HIBA au lieu de SYSTEM)
-    q.prepare("INSERT INTO \"EMPLOYES\"(\"ID_EMPLOYE\", \"NOM\", \"PRENOM\", \"POSTE\", \"SALAIRE\", \"ADRESSE\", \"TELEPHONE\", \"EMAIL\") "
-              "VALUES(?,?,?,?,?,?,?,?)");
+    q.prepare("INSERT INTO \"EMPLOYES\"(\"ID_EMPLOYE\", \"NOM\", \"PRENOM\", \"POSTE\", \"SALAIRE\", \"ADRESSE\", \"TELEPHONE\", \"EMAIL\", \"PASSWORD\") "
+              "VALUES(?,?,?,?,?,?,?,?,?)");
     q.addBindValue(useId);
     q.addBindValue(nom.left(20).trimmed());
     q.addBindValue(prenom.left(20).trimmed());
@@ -41,6 +41,7 @@ bool Employee::insert(int &outId, QString &errorText) const
     q.addBindValue(adresse.left(20).trimmed());
     q.addBindValue(QVariant(static_cast<qlonglong>(telephone)));
     q.addBindValue(email.left(20).trimmed());
+    q.addBindValue(password.trimmed());
 
     if (!q.exec()) {
         const QSqlError err = q.lastError();
@@ -53,8 +54,8 @@ bool Employee::insert(int &outId, QString &errorText) const
         // Fallback vers SQL littéral
         auto esc = [](const QString &s){ QString t=s; t.replace("'", "''"); return t; };
         QString literalSql = QString(
-            "INSERT INTO \"EMPLOYES\"(\"ID_EMPLOYE\", \"NOM\", \"PRENOM\", \"POSTE\", \"SALAIRE\", \"ADRESSE\", \"TELEPHONE\", \"EMAIL\") "
-            "VALUES(%1, '%2', '%3', '%4', %5, '%6', %7, '%8')")
+            "INSERT INTO \"EMPLOYES\"(\"ID_EMPLOYE\", \"NOM\", \"PRENOM\", \"POSTE\", \"SALAIRE\", \"ADRESSE\", \"TELEPHONE\", \"EMAIL\", \"PASSWORD\") "
+            "VALUES(%1, '%2', '%3', '%4', %5, '%6', %7, '%8', '%9')")
             .arg(useId)
             .arg(esc(nom.left(20).trimmed()))
             .arg(esc(prenom.left(20).trimmed()))
@@ -62,7 +63,8 @@ bool Employee::insert(int &outId, QString &errorText) const
             .arg(QString::number(salaire, 'f', 2))
             .arg(esc(adresse.left(20).trimmed()))
             .arg(QString::number(telephone))
-            .arg(esc(email.left(20).trimmed()));
+            .arg(esc(email.left(20).trimmed()))
+            .arg(esc(password.trimmed()));
         QSqlQuery q2;
         if (!q2.exec(literalSql)) {
             const QSqlError err2 = q2.lastError();
@@ -79,7 +81,7 @@ bool Employee::insert(int &outId, QString &errorText) const
 bool Employee::updateById(int id, QString &errorText) const
 {
     QSqlQuery q;
-    q.prepare("UPDATE \"EMPLOYES\" SET \"NOM\"=?, \"PRENOM\"=?, \"POSTE\"=?, \"SALAIRE\"=?, \"ADRESSE\"=?, \"TELEPHONE\"=?, \"EMAIL\"=? "
+    q.prepare("UPDATE \"EMPLOYES\" SET \"NOM\"=?, \"PRENOM\"=?, \"POSTE\"=?, \"SALAIRE\"=?, \"ADRESSE\"=?, \"TELEPHONE\"=?, \"EMAIL\"=?, \"PASSWORD\"=? "
               "WHERE \"ID_EMPLOYE\"=?");
     q.addBindValue(nom.left(20).trimmed());
     q.addBindValue(prenom.left(20).trimmed());
@@ -88,6 +90,7 @@ bool Employee::updateById(int id, QString &errorText) const
     q.addBindValue(adresse.left(20).trimmed());
     q.addBindValue(QVariant(static_cast<qlonglong>(telephone)));
     q.addBindValue(email.left(20).trimmed());
+    q.addBindValue(password.trimmed());
     q.addBindValue(id);
 
     if (!q.exec()) {
@@ -97,8 +100,8 @@ bool Employee::updateById(int id, QString &errorText) const
         // Fallback vers SQL littéral
         auto esc = [](const QString &s){ QString t=s; t.replace("'", "''"); return t; };
         QString literalSql = QString(
-            "UPDATE \"EMPLOYES\" SET \"NOM\"='%1', \"PRENOM\"='%2', \"POSTE\"='%3', \"SALAIRE\"=%4, \"ADRESSE\"='%5', \"TELEPHONE\"=%6, \"EMAIL\"='%7' "
-            "WHERE \"ID_EMPLOYE\"=%8")
+            "UPDATE \"EMPLOYES\" SET \"NOM\"='%1', \"PRENOM\"='%2', \"POSTE\"='%3', \"SALAIRE\"=%4, \"ADRESSE\"='%5', \"TELEPHONE\"=%6, \"EMAIL\"='%7', \"PASSWORD\"='%8' "
+            "WHERE \"ID_EMPLOYE\"=%9")
             .arg(esc(nom.left(20).trimmed()))
             .arg(esc(prenom.left(20).trimmed()))
             .arg(esc(poste.left(20).trimmed()))
@@ -106,6 +109,7 @@ bool Employee::updateById(int id, QString &errorText) const
             .arg(esc(adresse.left(20).trimmed()))
             .arg(QString::number(telephone))
             .arg(esc(email.left(20).trimmed()))
+            .arg(esc(password.trimmed()))
             .arg(id);
         QSqlQuery q2;
         if (!q2.exec(literalSql)) {
@@ -137,7 +141,7 @@ QVector<Employee> Employee::fetchAll(QString &errorText)
     QVector<Employee> items;
     QSqlQuery q;
     q.setForwardOnly(true);
-    q.prepare("SELECT \"ID_EMPLOYE\", \"NOM\", \"PRENOM\", \"EMAIL\", \"POSTE\", \"SALAIRE\", \"ADRESSE\", \"TELEPHONE\" "
+    q.prepare("SELECT \"ID_EMPLOYE\", \"NOM\", \"PRENOM\", \"EMAIL\", \"POSTE\", \"SALAIRE\", \"ADRESSE\", \"TELEPHONE\", \"PASSWORD\" "
               "FROM \"EMPLOYES\" ORDER BY \"ID_EMPLOYE\" ASC");
     
     if (!q.exec()) { 
@@ -157,6 +161,7 @@ QVector<Employee> Employee::fetchAll(QString &errorText)
         e.salaire = q.value(5).toDouble();
         e.adresse = q.value(6).toString();
         e.telephone = q.value(7).toLongLong();
+        e.password = q.value(8).toString();
         items.push_back(e);
         count++;
     }

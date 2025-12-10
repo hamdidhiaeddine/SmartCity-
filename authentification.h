@@ -23,12 +23,14 @@ private slots:
     void onConnexionClicked();
     void onInscriptionClicked();
     void onMotDePasseOublieClicked();
+    void onConnexionVisage();
 
 private:
     Ui::Authentification *ui;
     bool m_authentifie;
     
     bool validerConnexion(const QString &identifiant, const QString &motDePasse);
+    bool validerConnexionVisage();
 };
 
 #endif // AUTHENTIFICATION_H

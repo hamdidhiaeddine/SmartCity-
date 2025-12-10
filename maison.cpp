@@ -233,20 +233,29 @@ void Maison::afficher(QTableWidget *table)
         return;
     }
     QVector<QVector<QString>> rows;
+    QVector<int> maisonIds;
     while (q.next()) {
         QVector<QString> r;
+        int idMaison = q.value(0).toInt();
         r << q.value(0).toString()
           << q.value(1).toString()
           << q.value(2).toString()
           << q.value(3).toString()
           << q.value(4).toString()
           << q.value(5).toString();
+        
+        // Récupérer les résidents pour cette maison
+        QStringList residents = getResidentsParMaison(idMaison);
+        QString residentsText = residents.isEmpty() ? "Aucun" : QString::number(residents.count()) + " résident(s)";
+        r << residentsText;
+        
         rows.push_back(r);
+        maisonIds.push_back(idMaison);
     }
     table->clear();
-    table->setColumnCount(6);
+    table->setColumnCount(7);
     table->setRowCount(rows.size());
-    QStringList headers; headers << "ID Maison" << "Adresse" << "Sécurité" << "Statut" << "Type" << "Nbr Pièces";
+    QStringList headers; headers << "ID Maison" << "Adresse" << "Sécurité" << "Statut" << "Type" << "Nbr Pièces" << "Résidents";
     table->setHorizontalHeaderLabels(headers);
     for (int i = 0; i < rows.size(); ++i) {
         const auto &r = rows[i];
@@ -358,7 +367,61 @@ bool Maison::idExists(int id)
     QSqlQuery q(QSqlDatabase::database("qt_oracle"));
     q.prepare("SELECT 1 FROM GEST_MAISON WHERE ID=:id");
     q.bindValue(":id", id);
-    return q.exec() && q.next();
+    return (q.exec() && q.next());
+}
+
+QStringList Maison::getResidentsParMaison(int idMaison)
+{
+    QStringList residents;
+    QSqlQuery q(QSqlDatabase::database("qt_oracle"));
+    
+    // Requête pour récupérer les résidents par ID_MAISON (clé étrangère)
+    q.prepare("SELECT NOM, PRENOM, TELEPHONE "
+              "FROM GEST_RESIDENT "
+              "WHERE ID_MAISON = :id_maison "
+              "ORDER BY NOM, PRENOM");
+    q.bindValue(":id_maison", idMaison);
+    
+    if (q.exec()) {
+        while (q.next()) {
+            QString nom = q.value(0).toString();
+            QString prenom = q.value(1).toString();
+            QString telephone = q.value(2).toString();
+            residents << QString("%1 %2 (%3)").arg(nom, prenom, telephone);
+        }
+    }
+    
+    return residents;
+}
+
+bool Maison::assignerResidentAMaison(const QString &idResident, int idMaison)
+{
+    // Vérifier que la maison existe
+    QSqlQuery qMaison(QSqlDatabase::database("qt_oracle"));
+    qMaison.prepare("SELECT ID, ADRESSE FROM GEST_MAISON WHERE ID = :id");
+    qMaison.bindValue(":id", idMaison);
+    
+    if (!qMaison.exec() || !qMaison.next()) {
+        qDebug() << "Maison introuvable";
+        return false;
+    }
+    
+    QString adresseMaison = qMaison.value(1).toString();
+    
+    // Mettre à jour ID_MAISON et ADRESSE du résident
+    QSqlQuery qUpdate(QSqlDatabase::database("qt_oracle"));
+    qUpdate.prepare("UPDATE GEST_RESIDENT SET ID_MAISON = :id_maison, ADRESSE = :adresse WHERE ID = :id");
+    qUpdate.bindValue(":id_maison", idMaison);
+    qUpdate.bindValue(":adresse", adresseMaison);
+    qUpdate.bindValue(":id", idResident);
+    
+    if (!qUpdate.exec()) {
+        qDebug() << "Erreur lors de l'assignation du résident:" << qUpdate.lastError().text();
+        return false;
+    }
+    
+    qDebug() << "Résident" << idResident << "assigné à la maison" << idMaison;
+    return true;
 }
 // Convenience constructor used by UI: adresse, statut, securiteText, nbrPieces, type
 Maison::Maison(const QString &adresseIn, const QString &statutIn, const QString &securiteText, int nbrPiecesIn, const QString &typeIn)

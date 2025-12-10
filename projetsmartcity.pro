@@ -4,9 +4,9 @@
 #
 #-------------------------------------------------
 
-QT       += core gui sql printsupport charts network
+QT       += core gui sql serialport
 
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport charts network multimedia multimediawidgets
 
 TARGET = Atelier_Connexion
 TEMPLATE = app
@@ -35,7 +35,19 @@ SOURCES += \
     Employee.cpp \
     vehicule.cpp \
     authentification.cpp \
-    maison.cpp
+    maison.cpp \
+    jardin.cpp \
+    maintenance.cpp \
+    maintenancedialog.cpp \
+    recommandationplante.cpp \
+    recommandationdialog.cpp \
+    cabinet.cpp \
+    cabinetdialog.cpp \
+    alerte.cpp \
+    facialrecognition.cpp \
+    facecapturedialog.cpp \
+    arduinorfid.cpp \
+    temperaturesensor.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -47,7 +59,19 @@ HEADERS += \
     Employee.h \
     vehicule.h \
     authentification.h \
-    maison.h
+    maison.h \
+    jardin.h \
+    maintenance.h \
+    maintenancedialog.h \
+    recommandationplante.h \
+    recommandationdialog.h \
+    cabinet.h \
+    cabinetdialog.h \
+    alerte.h \
+    facialrecognition.h \
+    facecapturedialog.h \
+    arduinorfid.h \
+    temperaturesensor.h
 FORMS += \
         mainwindow.ui \
     authentification.ui

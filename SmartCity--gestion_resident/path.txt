@@ -1,0 +1,11 @@
+# Example path list for videos. Each line is either:
+# name:path OR path
+# Paths are relative to project root by default (but Metier accepts absolute paths too).
+
+cabinet1:vd/vd1.mp4
+cabinet2:vd/vd2.mp4
+cabinet3:vd/vd3.mp4
+cabinet4:vd/vd4.mp4
+
+# Additional examples (not present necessarily):
+# vd/cabinetdoctor.mp4

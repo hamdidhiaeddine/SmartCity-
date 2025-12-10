@@ -1,0 +1,76 @@
+===========================================
+OÙ ÉCRIRE LE CHEMIN DANS QT CREATOR
+===========================================
+
+VOUS ÊTES DANS LA FENÊTRE "RUN SETTINGS" - PARFAIT!
+
+ÉTAPE PAR ÉTAPE:
+
+1. DANS LA SECTION "RUN":
+   → Vous voyez un champ "Executable:" avec un champ vide
+   → Ce champ affiche: "Enter the path to the executable"
+
+2. CLIQUEZ DANS CE CHAMP VIDE
+   → Le curseur apparaît dans le champ
+
+3. TAPEZ OU COLLEZ LE CHEMIN:
+   C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\Atelier_Connexion.exe
+
+   OU
+
+   → Cliquez sur le bouton "Browse..." à droite du champ
+   → Naviguez vers: C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\
+   → Sélectionnez: Atelier_Connexion.exe
+   → Cliquez sur "Ouvrir"
+
+4. DANS LE CHAMP "Working directory:":
+   → Cliquez dans le champ vide
+   → Tapez: C:\ayooo
+   
+   OU
+   
+   → Cliquez sur "Browse..." à côté
+   → Naviguez vers: C:\ayooo
+   → Cliquez sur "Ouvrir"
+
+5. EN BAS DE LA FENÊTRE:
+   → Cliquez sur le bouton "Apply" (Appliquer)
+
+6. VOUS POUVEZ MAINTENANT:
+   → Cliquer sur le bouton vert "Run" en bas à gauche de Qt Creator
+   → OU appuyer sur Ctrl+R
+
+===========================================
+RÉSUMÉ VISUEL:
+===========================================
+
+┌─────────────────────────────────────┐
+│ Run Settings                        │
+├─────────────────────────────────────┤
+│ Run:                                │
+│                                     │
+│ Run configuration:                  │
+│ [projetsmartcity2 [unavailable]] ▼ │
+│                                     │
+│ Executable:                         │
+│ [ICI → TAPEZ LE CHEMIN]             │ ← VOUS ÊTES ICI
+│ [Browse...]                         │
+│                                     │
+│ Working directory:                  │
+│ [ICI → TAPEZ: C:\ayooo]            │
+│ [Browse...]                         │
+│                                     │
+│ [Apply] [Cancel]                    │
+└─────────────────────────────────────┘
+
+===========================================
+CHEMIN COMPLET À TAPER:
+===========================================
+
+C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\Atelier_Connexion.exe
+
+===========================================
+
+
+
+
