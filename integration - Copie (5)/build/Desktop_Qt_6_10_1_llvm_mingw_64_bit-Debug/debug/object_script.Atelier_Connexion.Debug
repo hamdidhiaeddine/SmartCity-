@@ -1,0 +1,17 @@
+debug/main.o
+debug/mainwindow.o
+debug/connection.o
+debug/resident.o
+debug/historique.o
+debug/smsmanager.o
+debug/smsreceiver.o
+debug/Employee.o
+debug/vehicule.o
+debug/authentification.o
+debug/maison.o
+debug/qrc_resources.o
+debug/moc_mainwindow.o
+debug/moc_smsmanager.o
+debug/moc_smsreceiver.o
+debug/moc_authentification.o
+debug/moc_maison.o
