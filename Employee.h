@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QMap>
+#include <QVector>
 
 struct Employee
 {
@@ -14,6 +15,7 @@ struct Employee
     QString adresse;
     long long telephone = 0;
     QString email;
+    QString password;
 
     // CRUD instance helpers
     bool insert(int &outId, QString &errorText) const;        // create

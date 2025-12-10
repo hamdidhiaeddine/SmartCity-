@@ -1,0 +1,84 @@
+===========================================
+GUIDE RAPIDE - HISTORIQUE INTROUVABLE
+===========================================
+
+PROBLÈME: L'application ne trouve pas l'historique dans la base.
+
+SOLUTION RAPIDE:
+================
+
+1. VÉRIFIER QUE LA TABLE EXISTE
+   → Ouvrez SQL Developer ou SQL*Plus
+   → Connectez-vous avec l'utilisateur: hiba / esprit18
+   → Exécutez:
+   
+   SELECT COUNT(*) FROM HIBA.HISTORIQUE_RESIDENT;
+   
+   Si erreur "table n'existe pas":
+   → Exécutez le script: create_historique_table.sql
+
+2. VÉRIFIER LE SYNONYME
+   → Exécutez:
+   
+   SELECT * FROM USER_SYNONYMS 
+   WHERE SYNONYM_NAME = 'HIST_RESIDENT';
+   
+   Si vide:
+   → Exécutez:
+   
+   CREATE OR REPLACE SYNONYM HIBA.HIST_RESIDENT 
+   FOR HIBA.HISTORIQUE_RESIDENT;
+
+3. CRÉER LES TRIGGERS (pour remplissage automatique)
+   → Exécutez le script: create_trigger_historique.sql
+
+4. TESTER
+   → Dans l'application, ajoutez un résident
+   → Vérifiez l'historique
+   → Si toujours vide, exécutez: diagnostic_historique.sql
+
+===========================================
+SCRIPTS À EXÉCUTER (dans l'ordre):
+===========================================
+
+1. create_historique_table.sql
+   → Crée la table et la séquence
+
+2. create_trigger_historique.sql
+   → Crée les triggers automatiques
+
+3. diagnostic_historique.sql
+   → Vérifie que tout fonctionne
+
+===========================================
+VÉRIFICATION RAPIDE:
+===========================================
+
+Exécutez dans SQL:
+SELECT COUNT(*) AS TOTAL FROM HIBA.HISTORIQUE_RESIDENT;
+
+Si le résultat est 0:
+→ La table existe mais est vide
+→ Les triggers ne fonctionnent peut-être pas
+→ Vérifiez avec: diagnostic_historique.sql
+
+Si erreur "table n'existe pas":
+→ Exécutez: create_historique_table.sql
+
+===========================================
+AMÉLIORATION DU CODE:
+===========================================
+
+Le code a été amélioré pour:
+✓ Essayer plusieurs noms de table
+✓ Afficher des messages d'erreur détaillés
+✓ Donner des instructions de diagnostic
+
+Recompilez l'application pour voir les nouveaux messages!
+
+===========================================
+
+
+
+
+

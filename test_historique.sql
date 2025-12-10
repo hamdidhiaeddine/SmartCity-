@@ -1,0 +1,45 @@
+-- Script de test pour vérifier la table et les triggers d'historique
+-- Base de données Oracle
+
+-- 1. Vérifier que la table existe
+SELECT 'Vérification de la table...' AS ETAPE FROM DUAL;
+SELECT TABLE_NAME, NUM_ROWS 
+FROM USER_TABLES 
+WHERE TABLE_NAME IN ('HISTORIQUE_RESIDENT', 'HIST_RESIDENT');
+
+-- 2. Vérifier la structure de la table
+SELECT 'Structure de la table...' AS ETAPE FROM DUAL;
+DESC HIBA.HISTORIQUE_RESIDENT;
+
+-- 3. Vérifier que les triggers existent
+SELECT 'Vérification des triggers...' AS ETAPE FROM DUAL;
+SELECT TRIGGER_NAME, STATUS, TRIGGER_TYPE, TRIGGERING_EVENT, TABLE_NAME
+FROM USER_TRIGGERS 
+WHERE TRIGGER_NAME LIKE 'TRG_AUTO_HISTORIQUE%' OR TRIGGER_NAME LIKE 'TRG_HISTORIQUE%'
+ORDER BY TRIGGER_NAME;
+
+-- 4. Vérifier la séquence
+SELECT 'Vérification de la séquence...' AS ETAPE FROM DUAL;
+SELECT SEQUENCE_NAME, LAST_NUMBER, INCREMENT_BY
+FROM USER_SEQUENCES
+WHERE SEQUENCE_NAME LIKE '%HISTORIQUE%' OR SEQUENCE_NAME LIKE '%HIST_RESIDENT%';
+
+-- 5. Voir les données actuelles dans l'historique
+SELECT 'Données dans l''historique...' AS ETAPE FROM DUAL;
+SELECT ID_HISTORIQUE, ID_RESIDENT, ACTION, DATE_ACTION
+FROM HIBA.HISTORIQUE_RESIDENT
+ORDER BY DATE_ACTION DESC;
+
+-- 6. Compter par type d'action
+SELECT 'Comptage par action...' AS ETAPE FROM DUAL;
+SELECT ACTION, COUNT(*) AS NOMBRE
+FROM HIBA.HISTORIQUE_RESIDENT
+GROUP BY ACTION
+ORDER BY ACTION;
+
+-- 7. Vérifier le synonyme
+SELECT 'Vérification du synonyme...' AS ETAPE FROM DUAL;
+SELECT SYNONYM_NAME, TABLE_OWNER, TABLE_NAME
+FROM USER_SYNONYMS
+WHERE SYNONYM_NAME = 'HIST_RESIDENT';
+

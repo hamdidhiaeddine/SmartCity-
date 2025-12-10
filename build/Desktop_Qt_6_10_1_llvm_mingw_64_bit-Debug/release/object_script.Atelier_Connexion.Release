@@ -1,0 +1,17 @@
+release/main.o
+release/mainwindow.o
+release/connection.o
+release/resident.o
+release/historique.o
+release/smsmanager.o
+release/smsreceiver.o
+release/Employee.o
+release/vehicule.o
+release/authentification.o
+release/maison.o
+release/qrc_resources.o
+release/moc_mainwindow.o
+release/moc_smsmanager.o
+release/moc_smsreceiver.o
+release/moc_authentification.o
+release/moc_maison.o

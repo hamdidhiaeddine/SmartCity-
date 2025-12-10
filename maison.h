@@ -1,48 +1,74 @@
 #ifndef MAISON_H
 #define MAISON_H
 
+#include <QObject>
 #include <QString>
-#include <QSqlQuery>
-#include <QSqlError>
-#include <QDebug>
+#include <QSqlQueryModel>
+#include <QMap>
 #include <QTableWidget>
-#include <QTableWidgetItem>
-#include <QMessageBox>
 
-class Maison
+class Maison : public QObject
 {
-private:
-    int id_maison;
-    QString adresse;
-    QString statut;
-    QString securite;
-    int nbr_pieces;
-    QString type;
+    Q_OBJECT
 
 public:
-    Maison();
-    Maison(QString adresse, QString statut, QString securite, int nbr_pieces, QString type);
+    explicit Maison(QObject *parent = nullptr);
 
-    // CRUD operations
-    bool ajouter(int id_maison = -1, QString *errorMessage = nullptr); // -1 = auto-generate ID
-    bool modifier(int oldId, int newId = -1, QString *errorMessage = nullptr); // oldId = ID à modifier, newId = nouvel ID (si -1, garde l'ancien)
-    bool supprimer(int id, QString *errorMessage = nullptr);
-    static void afficher(QTableWidget *table);
-    
+    Maison(int id, const QString &adresse, int securite, const QString &statut);
+    Maison(int id, const QString &adresse, int securite, const QString &statut,
+           const QString &type, int nbrPieces);
+    Maison(const QString &adresse, const QString &statut, const QString &securiteText,
+           int nbrPieces, const QString &type);
+
     // Getters
-    QString getAdresse() const { return adresse; }
-    QString getStatut() const { return statut; }
-    QString getSecurite() const { return securite; }
-    int getNbrPieces() const { return nbr_pieces; }
-    QString getType() const { return type; }
-    
-    // Validation
+    int getId() const;
+    QString getAdresse() const;
+    int getSecurite() const;
+    QString getStatut() const;
+    QString getType() const;
+    int getNbrPieces() const;
+
+    // Setters
+    void setId(int id);
+    void setAdresse(const QString &adresse);
+    void setSecurite(int securite);
+    void setStatut(const QString &statut);
+    void setType(const QString &type);
+    void setNbrPieces(int nbrPieces);
+
+    // CRUD
+    bool ajouter();
+    bool ajouter(int idOverride, QString *errorText);
+    bool modifier(int id);
+    bool modifier(int oldId, int newId, QString *errorText);
+    bool supprimer(int id);
+    bool supprimer(int id, QString *errorText);
+    bool rechercher(int id);
+    static QSqlQueryModel* afficher();
+    static void afficher(QTableWidget *table);
+    static QSqlQueryModel* afficher_selon_niv_sec_2();
+
+    // Statistiques
+    QMap<QString,int> getStatistiquesStatus();
+    QMap<QString,int> getStatistiquesNiveauSecurite();
+
+    // Validation & helpers
     static bool validateAdresse(const QString &adresse, QString &error);
+    static bool validateSecurite(const QString &securiteText, QString &error);
     static bool validateStatut(const QString &statut, QString &error);
-    static bool validateSecurite(const QString &securite, QString &error);
-    static bool validateNbrPieces(int nbr_pieces, QString &error);
     static bool validateType(const QString &type, QString &error);
-    static bool idExists(int id); // Vérifie si un ID existe déjà
+    static bool validateNbrPieces(int nbrPieces, QString &error);
+    static bool idExists(int id);
+    static QStringList getResidentsParMaison(int idMaison);
+    static bool assignerResidentAMaison(const QString &idResident, int idMaison);
+
+private:
+    int id;
+    QString adresse;
+    int securite;
+    QString statut;
+    QString type;
+    int nbrPieces;
 };
 
 #endif // MAISON_H

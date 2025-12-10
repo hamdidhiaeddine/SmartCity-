@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Dialog</class>
- <widget class="QDialog" name="Dialog">
+ <class>Authentification</class>
+ <widget class="QDialog" name="Authentification">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -265,6 +265,36 @@ border-left:3.2px solid #1BA019 ;
    </property>
    <property name="autoRepeatInterval">
     <number>100</number>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="connexionVisageBtn">
+   <property name="geometry">
+    <rect>
+     <x>660</x>
+     <y>520</y>
+     <width>91</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QPushButton {
+    background-color: #673AB7;
+    color: white;
+    padding: 8px 16px;
+    font-size: 14px;
+    border: none;
+    border-radius: 25px;
+    font-family: Lexend;
+}
+QPushButton:hover {
+    background-color: #5E35B1;
+}
+QPushButton:pressed {
+    background-color: #4527A0;
+}</string>
+   </property>
+   <property name="text">
+    <string>🔐 Visage</string>
    </property>
   </widget>
   <widget class="QLabel" name="motdepasseoublier_2">
