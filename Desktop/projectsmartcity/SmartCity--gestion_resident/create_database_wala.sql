@@ -1,0 +1,330 @@
+-- =====================================================
+-- SCRIPT DE CRÉATION COMPLÈTE DE LA BASE DE DONNÉES
+-- Projet SMARTCITY - Gestion Résidents
+-- Pour l'utilisateur: WALA
+-- Date : 7 Décembre 2025
+-- =====================================================
+
+SET ECHO ON
+SET SERVEROUTPUT ON
+
+PROMPT ============================================================
+PROMPT NETTOYAGE DES TABLES EXISTANTES
+PROMPT ============================================================
+
+-- Supprimer les tables dans l'ordre inverse des dépendances
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE GEST_RESIDENT_MAISON CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE GEST_RESIDENT_JARDIN CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE HISTORIQUE_RESIDENT CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE EMPLOYES CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE VEHICULE CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE GEST_CABINET CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE GEST_JARDIN CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE GEST_MAISON CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE GEST_ALERTES CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE GEST_RESIDENT CASCADE CONSTRAINTS'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+-- Supprimer les séquences
+BEGIN EXECUTE IMMEDIATE 'DROP SEQUENCE SEQ_VEHI'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP SEQUENCE SEQ_ALERTES'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+BEGIN EXECUTE IMMEDIATE 'DROP SEQUENCE HISTORIQUE_RESIDENT_SEQ'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+PROMPT ============================================================
+PROMPT CRÉATION DES TABLES
+PROMPT ============================================================
+
+-- ============================================================
+-- TABLE 1: GEST_RESIDENT (Résidents)
+-- ============================================================
+PROMPT Création de la table GEST_RESIDENT...
+
+CREATE TABLE GEST_RESIDENT (
+    ID NUMBER PRIMARY KEY,
+    NOM VARCHAR2(100) NOT NULL,
+    PRENOM VARCHAR2(100) NOT NULL,
+    DATENAISS DATE,
+    ADRESSE VARCHAR2(200),
+    TELEPHONE VARCHAR2(20),
+    EMAIL VARCHAR2(100),
+    STATUT VARCHAR2(50) DEFAULT 'Actif',
+    SITUATIONFAMILIALE VARCHAR2(50)
+);
+
+PROMPT ✓ Table GEST_RESIDENT créée
+
+-- ============================================================
+-- TABLE 2: EMPLOYES (Employés)
+-- ============================================================
+PROMPT Création de la table EMPLOYES...
+
+CREATE TABLE EMPLOYES (
+    ID_EMPLOYE NUMBER PRIMARY KEY,
+    NOM VARCHAR2(100),
+    PRENOM VARCHAR2(100),
+    EMAIL VARCHAR2(100),
+    POSTE VARCHAR2(100),
+    SALAIRE NUMBER,
+    ADRESSE VARCHAR2(200),
+    TELEPHONE NUMBER,
+    ID_RES NUMBER,
+    CONSTRAINT FK_EMPLOYE_RESIDENT FOREIGN KEY (ID_RES) REFERENCES GEST_RESIDENT(ID) ON DELETE SET NULL
+);
+
+PROMPT ✓ Table EMPLOYES créée
+
+-- ============================================================
+-- TABLE 3: VEHICULE (Véhicules)
+-- ============================================================
+PROMPT Création de la table VEHICULE...
+
+CREATE SEQUENCE SEQ_VEHI START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE VEHICULE (
+    ID_VEHI NUMBER PRIMARY KEY,
+    IMMAT VARCHAR2(50),
+    MARQUE VARCHAR2(50),
+    MODELE VARCHAR2(50),
+    TYPE VARCHAR2(50),
+    ETAT VARCHAR2(50),
+    SERVICE VARCHAR2(50),
+    DATE_MAINT DATE
+);
+
+PROMPT ✓ Table VEHICULE et séquence SEQ_VEHI créées
+
+-- ============================================================
+-- TABLE 4: GEST_MAISON (Maisons)
+-- ============================================================
+PROMPT Création de la table GEST_MAISON...
+
+CREATE TABLE GEST_MAISON (
+    ID NUMBER PRIMARY KEY,
+    ADRESSE VARCHAR2(200),
+    SECURITE NUMBER CHECK (SECURITE BETWEEN 1 AND 5),
+    STATUS VARCHAR2(50),
+    TYPE VARCHAR2(50),
+    NBRDESPIECES NUMBER
+);
+
+PROMPT ✓ Table GEST_MAISON créée
+
+-- ============================================================
+-- TABLE 5: GEST_ALERTES (Alertes)
+-- ============================================================
+PROMPT Création de la table GEST_ALERTES...
+
+CREATE SEQUENCE SEQ_ALERTES START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE GEST_ALERTES (
+    ID NUMBER PRIMARY KEY,
+    ID_MAISON NUMBER NOT NULL,
+    ZONE VARCHAR2(200),
+    NIVEAU NUMBER,
+    STATUT VARCHAR2(50) DEFAULT 'En attente',
+    DATE_ALERTE DATE DEFAULT SYSDATE,
+    CONSTRAINT FK_ALERTE_MAISON FOREIGN KEY (ID_MAISON) REFERENCES GEST_MAISON(ID) ON DELETE CASCADE
+);
+
+-- Trigger auto-increment pour GEST_ALERTES
+CREATE OR REPLACE TRIGGER TRG_ALERTE_ID
+BEFORE INSERT ON GEST_ALERTES
+FOR EACH ROW
+BEGIN
+    IF :NEW.ID IS NULL THEN
+        SELECT SEQ_ALERTES.NEXTVAL INTO :NEW.ID FROM DUAL;
+    END IF;
+END;
+/
+
+PROMPT ✓ Table GEST_ALERTES, séquence et trigger créés
+
+-- ============================================================
+-- TABLE 6: GEST_JARDIN (Jardins)
+-- ============================================================
+PROMPT Création de la table GEST_JARDIN...
+
+CREATE TABLE GEST_JARDIN (
+    ID_JARDIN NUMBER PRIMARY KEY,
+    EMPLACEMENT VARCHAR2(200),
+    SUPERFICIE NUMBER,
+    TYPE_SOL VARCHAR2(100),
+    TYPE_CHOIX VARCHAR2(100)
+);
+
+PROMPT ✓ Table GEST_JARDIN créée
+
+-- ============================================================
+-- TABLE 7: GEST_CABINET (Cabinets médicaux)
+-- ============================================================
+PROMPT Création de la table GEST_CABINET...
+
+CREATE TABLE GEST_CABINET (
+    ID NUMBER PRIMARY KEY,
+    NOM VARCHAR2(200),
+    ADRESSE VARCHAR2(200),
+    SPECIALITE VARCHAR2(100),
+    TELEPHONE VARCHAR2(20),
+    EMAIL VARCHAR2(100),
+    ID_RESIDENT NUMBER,
+    CONSTRAINT FK_CABINET_RESIDENT FOREIGN KEY (ID_RESIDENT) REFERENCES GEST_RESIDENT(ID) ON DELETE SET NULL
+);
+
+PROMPT ✓ Table GEST_CABINET créée
+
+-- ============================================================
+-- TABLE 8: HISTORIQUE_RESIDENT (Historique)
+-- ============================================================
+PROMPT Création de la table HISTORIQUE_RESIDENT...
+
+CREATE SEQUENCE HISTORIQUE_RESIDENT_SEQ START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE HISTORIQUE_RESIDENT (
+    ID_HISTORIQUE NUMBER PRIMARY KEY,
+    ID_RESIDENT NUMBER,
+    ACTION VARCHAR2(50),
+    DATE_ACTION DATE DEFAULT SYSDATE,
+    CONSTRAINT FK_HIST_RESIDENT FOREIGN KEY (ID_RESIDENT) REFERENCES GEST_RESIDENT(ID) ON DELETE CASCADE
+);
+
+-- Trigger pour insertion automatique
+CREATE OR REPLACE TRIGGER TRG_HIST_AUTO_ID
+BEFORE INSERT ON HISTORIQUE_RESIDENT
+FOR EACH ROW
+BEGIN
+    IF :NEW.ID_HISTORIQUE IS NULL THEN
+        SELECT HISTORIQUE_RESIDENT_SEQ.NEXTVAL INTO :NEW.ID_HISTORIQUE FROM DUAL;
+    END IF;
+END;
+/
+
+-- Trigger pour enregistrer les ajouts
+CREATE OR REPLACE TRIGGER TRG_HIST_INSERT
+AFTER INSERT ON GEST_RESIDENT
+FOR EACH ROW
+BEGIN
+    INSERT INTO HISTORIQUE_RESIDENT (ID_RESIDENT, ACTION)
+    VALUES (:NEW.ID, 'Ajout');
+END;
+/
+
+-- Trigger pour enregistrer les modifications
+CREATE OR REPLACE TRIGGER TRG_HIST_UPDATE
+AFTER UPDATE ON GEST_RESIDENT
+FOR EACH ROW
+BEGIN
+    INSERT INTO HISTORIQUE_RESIDENT (ID_RESIDENT, ACTION)
+    VALUES (:NEW.ID, 'Modification');
+END;
+/
+
+PROMPT ✓ Table HISTORIQUE_RESIDENT, séquence et triggers créés
+
+-- ============================================================
+-- INSERTION DES DONNÉES DE TEST
+-- ============================================================
+PROMPT ============================================================
+PROMPT INSERTION DES DONNÉES DE TEST
+PROMPT ============================================================
+
+-- Résidents
+INSERT INTO GEST_RESIDENT (ID, NOM, PRENOM, DATENAISS, ADRESSE, TELEPHONE, EMAIL, STATUT, SITUATIONFAMILIALE)
+VALUES (1, 'Dupont', 'Jean', TO_DATE('1985-05-15', 'YYYY-MM-DD'), '10 Rue de Paris', '+33123456789', 'jean.dupont@email.fr', 'Actif', 'Marié');
+
+INSERT INTO GEST_RESIDENT (ID, NOM, PRENOM, DATENAISS, ADRESSE, TELEPHONE, EMAIL, STATUT, SITUATIONFAMILIALE)
+VALUES (2, 'Martin', 'Marie', TO_DATE('1990-08-22', 'YYYY-MM-DD'), '25 Avenue des Champs', '+33987654321', 'marie.martin@email.fr', 'Actif', 'Célibataire');
+
+INSERT INTO GEST_RESIDENT (ID, NOM, PRENOM, DATENAISS, ADRESSE, TELEPHONE, EMAIL, STATUT, SITUATIONFAMILIALE)
+VALUES (3, 'Bernard', 'Pierre', TO_DATE('1978-12-10', 'YYYY-MM-DD'), '5 Boulevard Victor Hugo', '+33555666777', 'pierre.bernard@email.fr', 'Actif', 'Divorcé');
+
+-- Employés
+INSERT INTO EMPLOYES (ID_EMPLOYE, NOM, PRENOM, EMAIL, POSTE, SALAIRE, ADRESSE, TELEPHONE, ID_RES)
+VALUES (1, 'Dupont', 'Jean', 'j.dupont@city.fr', 'Technicien', 2500, '10 Rue Tech', 123456789, 1);
+
+INSERT INTO EMPLOYES (ID_EMPLOYE, NOM, PRENOM, EMAIL, POSTE, SALAIRE, ADRESSE, TELEPHONE, ID_RES)
+VALUES (2, 'Martin', 'Sophie', 's.martin@city.fr', 'Manager', 3500, '20 Av Manager', 987654321, 2);
+
+-- Véhicules
+INSERT INTO VEHICULE (ID_VEHI, IMMAT, MARQUE, MODELE, TYPE, ETAT, SERVICE, DATE_MAINT)
+VALUES (SEQ_VEHI.NEXTVAL, 'AB-123-CD', 'Renault', 'Clio', 'Citadine', 'Bon', 'Transport', TO_DATE('2024-12-01', 'YYYY-MM-DD'));
+
+INSERT INTO VEHICULE (ID_VEHI, IMMAT, MARQUE, MODELE, TYPE, ETAT, SERVICE, DATE_MAINT)
+VALUES (SEQ_VEHI.NEXTVAL, 'EF-456-GH', 'Peugeot', '308', 'Berline', 'Excellent', 'Service', TO_DATE('2024-11-15', 'YYYY-MM-DD'));
+
+-- Maisons
+INSERT INTO GEST_MAISON (ID, ADRESSE, SECURITE, STATUS, TYPE, NBRDESPIECES)
+VALUES (1, '10 Rue de Paris', 3, 'Occupée', 'Villa', 5);
+
+INSERT INTO GEST_MAISON (ID, ADRESSE, SECURITE, STATUS, TYPE, NBRDESPIECES)
+VALUES (2, '25 Avenue des Champs', 5, 'Libre', 'Appartement', 3);
+
+-- Alertes
+INSERT INTO GEST_ALERTES (ID_MAISON, ZONE, NIVEAU, STATUT)
+VALUES (1, 'Entrée principale', 2, 'En cours');
+
+INSERT INTO GEST_ALERTES (ID_MAISON, ZONE, NIVEAU, STATUT)
+VALUES (2, 'Garage', 1, 'Résolue');
+
+-- Jardins
+INSERT INTO GEST_JARDIN (ID_JARDIN, EMPLACEMENT, SUPERFICIE, TYPE_SOL, TYPE_CHOIX)
+VALUES (1, 'Jardin Central', 500.5, 'Argileux', 'Public');
+
+INSERT INTO GEST_JARDIN (ID_JARDIN, EMPLACEMENT, SUPERFICIE, TYPE_SOL, TYPE_CHOIX)
+VALUES (2, 'Jardin Résidentiel A', 200.0, 'Sableux', 'Privé');
+
+-- Cabinets
+INSERT INTO GEST_CABINET (ID, NOM, ADRESSE, SPECIALITE, TELEPHONE, EMAIL, ID_RESIDENT)
+VALUES (1, 'Cabinet Dr. Leroy', '15 Rue Santé', 'Médecine générale', '+33111222333', 'dr.leroy@cabinet.fr', 1);
+
+INSERT INTO GEST_CABINET (ID, NOM, ADRESSE, SPECIALITE, TELEPHONE, EMAIL, ID_RESIDENT)
+VALUES (2, 'Cabinet Dentaire Martin', '8 Avenue Sourire', 'Dentiste', '+33444555666', 'contact@dentiste.fr', 2);
+
+COMMIT;
+
+PROMPT ============================================================
+PROMPT VÉRIFICATION DES DONNÉES
+PROMPT ============================================================
+
+SELECT 'GEST_RESIDENT' AS TABLE_NAME, COUNT(*) AS NB_RECORDS FROM GEST_RESIDENT
+UNION ALL
+SELECT 'EMPLOYES', COUNT(*) FROM EMPLOYES
+UNION ALL
+SELECT 'VEHICULE', COUNT(*) FROM VEHICULE
+UNION ALL
+SELECT 'GEST_MAISON', COUNT(*) FROM GEST_MAISON
+UNION ALL
+SELECT 'GEST_ALERTES', COUNT(*) FROM GEST_ALERTES
+UNION ALL
+SELECT 'GEST_JARDIN', COUNT(*) FROM GEST_JARDIN
+UNION ALL
+SELECT 'GEST_CABINET', COUNT(*) FROM GEST_CABINET
+UNION ALL
+SELECT 'HISTORIQUE_RESIDENT', COUNT(*) FROM HISTORIQUE_RESIDENT;
+
+PROMPT ============================================================
+PROMPT BASE DE DONNÉES CRÉÉE AVEC SUCCÈS !
+PROMPT ============================================================
+PROMPT Tables créées:
+PROMPT   ✓ GEST_RESIDENT (3 résidents)
+PROMPT   ✓ EMPLOYES (2 employés)
+PROMPT   ✓ VEHICULE (2 véhicules)
+PROMPT   ✓ GEST_MAISON (2 maisons)
+PROMPT   ✓ GEST_ALERTES (2 alertes)
+PROMPT   ✓ GEST_JARDIN (2 jardins)
+PROMPT   ✓ GEST_CABINET (2 cabinets)
+PROMPT   ✓ HISTORIQUE_RESIDENT (avec triggers automatiques)
+PROMPT ============================================================
+PROMPT Vous pouvez maintenant lancer l'application Qt !
+PROMPT ============================================================

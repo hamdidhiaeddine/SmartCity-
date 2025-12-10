@@ -1,0 +1,107 @@
+===========================================
+CONFIGURATION QT CREATOR - GUIDE COMPLET
+===========================================
+
+PROBLÈME: "No executable specified"
+
+L'exécutable existe à:
+C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\Atelier_Connexion.exe
+
+===========================================
+ÉTAPE PAR ÉTAPE DANS QT CREATOR
+===========================================
+
+1. OUVREZ LE PROJET
+   - Fichier → Ouvrir un fichier ou un projet
+   - Sélectionnez: C:\ayooo\projetsmartcity.pro
+   - Cliquez sur "Ouvrir"
+
+2. CONFIGUREZ LE KIT (si demandé)
+   - Si Qt Creator demande de configurer:
+     → Sélectionnez UNIQUEMENT "Desktop Qt 6.7.3 MinGW 64-bit"
+     → DÉSÉLECTIONNEZ tous les autres kits (Qt 5.x, 32-bit, etc.)
+     → Cliquez sur "Configure Project"
+
+3. ALLEZ DANS LES PARAMÈTRES DU PROJET
+   - Cliquez sur l'icône "Projets" dans la barre latérale GAUCHE
+     (Icône avec un dossier et un marteau, ou appuyez sur Ctrl+5)
+   
+   OU
+   
+   - Menu: Projets → Paramètres du projet
+
+4. CONFIGUREZ LA SECTION "RUN" (Exécution)
+   
+   Dans l'onglet "Run" (en haut, à côté de "Build"):
+   
+   a) EXECUTABLE:
+      - Cliquez sur le bouton "..." à côté de "Executable"
+      - Naviguez vers: C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\
+      - Sélectionnez: Atelier_Connexion.exe
+      - Cliquez sur "Ouvrir"
+   
+   b) WORKING DIRECTORY (Répertoire de travail):
+      - Cliquez sur le bouton "..." à côté de "Working directory"
+      - Naviguez vers: C:\ayooo
+      - Cliquez sur "Ouvrir"
+      - OU tapez directement: C:\ayooo
+   
+   c) VÉRIFIEZ:
+      - Executable: C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\Atelier_Connexion.exe
+      - Working directory: C:\ayooo
+
+5. SAUVEGARDEZ
+   - Cliquez sur "Apply" (Appliquer) en bas
+   - Puis "OK"
+
+6. CONSTRUISEZ LE PROJET (si nécessaire)
+   - Cliquez sur l'icône "Build" (marteau) ou Ctrl+B
+   - Attendez la fin
+
+7. EXÉCUTEZ
+   - Cliquez sur l'icône "Run" (flèche verte) ou Ctrl+R
+   - L'application devrait démarrer!
+
+===========================================
+SI VOUS NE VOYEZ PAS L'ONGLET "RUN"
+===========================================
+
+1. Assurez-vous d'être dans la vue "Projets"
+   - Icône "Projets" dans la barre latérale gauche
+   - Ou menu: Fenêtre → Vues → Projets
+
+2. Vérifiez que vous avez sélectionné le bon kit
+   - En haut de la fenêtre "Projets", vous devriez voir:
+     "Desktop Qt 6.7_3 MinGW 64-bit"
+   - Si vous voyez autre chose (Qt 5.x, win32, etc.):
+     → Cliquez sur "Gérer les kits"
+     → Désactivez les mauvais kits
+     → Activez uniquement Qt 6.7.3 MinGW 64-bit
+
+===========================================
+SOLUTION ALTERNATIVE (SANS QT CREATOR)
+===========================================
+
+Si Qt Creator continue à poser problème:
+
+1. Double-cliquez sur: Lancer_Application.bat
+   (dans le dossier C:\ayooo)
+
+2. OU exécutez directement:
+   C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\Atelier_Connexion.exe
+
+===========================================
+VÉRIFICATION RAPIDE
+===========================================
+
+L'exécutable doit exister ici:
+✓ C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\Atelier_Connexion.exe
+
+Si ce fichier n'existe pas:
+→ Compilez d'abord le projet (Build → Build Project)
+
+===========================================
+
+
+
+

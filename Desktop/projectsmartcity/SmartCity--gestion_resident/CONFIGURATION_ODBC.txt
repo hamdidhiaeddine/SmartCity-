@@ -1,0 +1,90 @@
+═══════════════════════════════════════════════════════════════
+CONFIGURATION DE LA SOURCE ODBC "Source_Projet2A"
+═══════════════════════════════════════════════════════════════
+
+📌 ÉTAPES À SUIVRE :
+
+1. Ouvrir l'administrateur ODBC
+   ---------------------------------
+   • Cherchez "ODBC" dans le menu Démarrer Windows
+   • Ouvrez "Sources de données ODBC (64 bits)"
+   
+2. Vérifier/Créer la source "Source_Projet2A"
+   -------------------------------------------
+   • Allez dans l'onglet "DSN Système" ou "DSN Utilisateur"
+   • Cherchez "Source_Projet2A"
+   
+   SI ELLE EXISTE :
+   ✓ Cliquez sur "Configurer"
+   ✓ Vérifiez les informations ci-dessous
+   
+   SI ELLE N'EXISTE PAS :
+   ✓ Cliquez sur "Ajouter"
+   ✓ Sélectionnez "Oracle in OraDB19Home1" (ou votre driver Oracle)
+   ✓ Cliquez "Terminer"
+
+3. Configuration de la source ODBC
+   ---------------------------------
+   Nom de la source de données : Source_Projet2A
+   Description              : Base de données SmartCity
+   TNS Service Name         : (sélectionnez votre base, ex: ORCL ou XE)
+   User ID                  : soumaya
+   
+   OU si pas de TNS :
+   
+   Data Source Name   : Source_Projet2A
+   Server/Hostname    : localhost
+   Port               : 1521
+   Service Name       : ORCL (ou XE, ou ORCLPDB)
+   User ID            : soumaya
+
+4. Tester la connexion
+   --------------------
+   • Cliquez sur "Test Connection"
+   • Entrez le mot de passe : esprit18
+   • Vous devriez voir "Connection successful"
+
+5. Valider
+   --------
+   • Cliquez "OK" pour sauvegarder
+   • Fermez l'administrateur ODBC
+
+═══════════════════════════════════════════════════════════════
+
+⚠️ NOTES IMPORTANTES :
+
+• Le nom EXACT doit être "Source_Projet2A" (avec majuscule S et P)
+• Si vous avez plusieurs versions d'Oracle, choisissez le bon driver
+• Assurez-vous que le service Oracle est démarré (services.msc)
+
+═══════════════════════════════════════════════════════════════
+
+📝 ALTERNATIVE : Utiliser une chaîne de connexion directe
+
+Si ODBC pose problème, modifiez connection.cpp :
+
+bool Connection::createconnect()
+{
+    bool test = false;
+    QSqlDatabase db = QSqlDatabase::addDatabase("QODBC");
+    
+    // Option 1 : DSN
+    db.setDatabaseName("source_projet2A");
+    
+    // Option 2 : Chaîne de connexion directe (si DSN ne fonctionne pas)
+    // db.setDatabaseName("DRIVER={Oracle in OraDB19Home1};SERVER=localhost;PORT=1521;DATABASE=ORCL;UID=soumaya;PWD=esprit18");
+    
+    db.setUserName("hiba");
+    db.setPassword("esprit18");
+    
+    if (db.open()) {
+        qDebug() << "✓ Connexion réussie !";
+        test = true;
+    } else {
+        qDebug() << "✗ Erreur de connexion :" << db.lastError().text();
+    }
+    
+    return test;
+}
+
+═══════════════════════════════════════════════════════════════

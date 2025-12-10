@@ -1,0 +1,59 @@
+===========================================
+INSTRUCTIONS RAPIDES - CONFIGURER L'EXECUTION
+===========================================
+
+VOUS ÊTES DÉJÀ DANS LA VUE "PROJECTS" - PARFAIT!
+
+ÉTAPES SUIVANTES (1 minute):
+
+1. EN HAUT DE LA FENÊTRE "PROJECTS":
+   → Regardez en haut, vous devriez voir des onglets:
+      [Build] [Run] [Editor] [Code Style] etc.
+   
+   → CLIQUEZ SUR L'ONGLET "RUN"
+
+2. DANS LA SECTION "EXECUTABLE":
+   → Vous verrez un champ "Executable" avec un bouton "..."
+   → CLIQUEZ SUR LE BOUTON "..." (trois points)
+   
+   → Une fenêtre s'ouvre pour choisir un fichier
+   → Naviguez vers:
+      C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\
+   
+   → Sélectionnez: Atelier_Connexion.exe
+   → Cliquez sur "Ouvrir"
+
+3. DANS LA SECTION "WORKING DIRECTORY":
+   → Cliquez sur le bouton "..." à côté de "Working directory"
+   → Naviguez vers: C:\ayooo
+   → Cliquez sur "Ouvrir"
+   → OU tapez directement: C:\ayooo
+
+4. EN BAS DE LA FENÊTRE:
+   → Cliquez sur "Apply" (Appliquer)
+
+5. EXÉCUTEZ:
+   → Cliquez sur le bouton vert "Run" en bas à gauche de Qt Creator
+   → OU appuyez sur Ctrl+R
+
+===========================================
+SI VOUS NE VOYEZ PAS L'ONGLET "RUN":
+===========================================
+
+→ En haut de la fenêtre "Projects", vous devriez voir:
+   [Build Settings] [Run Settings] [Editor Settings] etc.
+   
+→ Cliquez sur "Run Settings"
+
+===========================================
+CHEMIN COMPLET DE L'EXECUTABLE:
+===========================================
+
+C:\ayooo\build\Desktop_Qt_6_7_3_MinGW_64_bit-Debug\debug\Atelier_Connexion.exe
+
+===========================================
+
+
+
+
+
