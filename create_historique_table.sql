@@ -1,0 +1,49 @@
+-- Script SQL pour créer la table HISTORIQUE_RESIDENT
+-- Base de données Oracle
+
+-- Supprimer la table si elle existe déjà (optionnel, à utiliser avec précaution)
+-- DROP TABLE HIBA.HISTORIQUE_RESIDENT CASCADE CONSTRAINTS;
+
+-- Créer la table HISTORIQUE_RESIDENT
+-- Utiliser les noms de colonnes compatibles avec le code C++
+CREATE TABLE HIBA.HISTORIQUE_RESIDENT (
+    ID_HISTORIQUE NUMBER PRIMARY KEY,
+    ID_RESIDENT NUMBER NOT NULL,
+    ACTION VARCHAR2(50) NOT NULL,
+    DATE_ACTION DATE DEFAULT SYSDATE NOT NULL,
+    CONSTRAINT FK_HIST_RESIDENT FOREIGN KEY (ID_RESIDENT) 
+        REFERENCES HIBA.GEST_RESIDENT(ID)
+);
+
+-- Créer une séquence pour l'ID auto-incrémenté
+CREATE SEQUENCE HIBA.HISTORIQUE_RESIDENT_SEQ
+    START WITH 1
+    INCREMENT BY 1
+    NOCACHE
+    NOCYCLE;
+
+-- Créer un trigger pour auto-incrémenter l'ID
+CREATE OR REPLACE TRIGGER HIBA.TRG_HISTORIQUE_RESIDENT_ID
+    BEFORE INSERT ON HIBA.HISTORIQUE_RESIDENT
+    FOR EACH ROW
+BEGIN
+    IF :NEW.ID_HISTORIQUE IS NULL THEN
+        SELECT HIBA.HISTORIQUE_RESIDENT_SEQ.NEXTVAL INTO :NEW.ID_HISTORIQUE FROM DUAL;
+    END IF;
+END;
+/
+
+-- Créer un index sur ID_RESIDENT pour améliorer les performances
+CREATE INDEX HIBA.IDX_HIST_RESIDENT_ID ON HIBA.HISTORIQUE_RESIDENT(ID_RESIDENT);
+
+-- Créer un index sur DATE_ACTION pour améliorer les performances de tri
+CREATE INDEX HIBA.IDX_HIST_DATE_ACTION ON HIBA.HISTORIQUE_RESIDENT(DATE_ACTION);
+
+-- Créer un synonyme pour compatibilité avec le code C++ existant
+-- Le code utilise "HIST_RESIDENT", donc on crée un synonyme
+CREATE OR REPLACE SYNONYM HIBA.HIST_RESIDENT FOR HIBA.HISTORIQUE_RESIDENT;
+
+-- Afficher un message de confirmation
+SELECT 'Table HISTORIQUE_RESIDENT créée avec succès!' AS MESSAGE FROM DUAL;
+SELECT 'Synonyme HIST_RESIDENT créé pour compatibilité!' AS MESSAGE FROM DUAL;
+
